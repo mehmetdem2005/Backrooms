@@ -22,6 +22,13 @@ export/
 game_src/.godot/
 game_src/.import/
 
+# ---- TripoSR / ML asset generation (downloaded/generated, not source) ----
+.venv/
+TripoSR/
+output/
+install.log
+install_tripo.sh
+
 # ---- Misc ----
 *.tmp
 r21.xml
