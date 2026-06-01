@@ -9,7 +9,7 @@ class_name PremiumBackroomsBuilder
 @export var ceiling_height: float = 3.02
 @export var room_count: int = 15
 @export var detail_density: float = 1.0
-@export var chunk_size: int = 8
+@export var chunk_size: int = 12
 
 var start_cell: Vector2i = Vector2i(1, 1)
 var exit_cell: Vector2i = Vector2i(1, 1)
@@ -23,6 +23,8 @@ var exit_area: Area3D
 
 var _grid: Array[PackedByteArray] = []
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _box_mesh_shared: BoxMesh
+var _cylinder_mesh_shared: CylinderMesh
 var _wall_material: Material
 var _floor_material: Material
 var _ceiling_material: Material
@@ -606,18 +608,21 @@ func _should_place_ceiling_gap(cell: Vector2i) -> bool:
 
 
 func _box_mesh() -> BoxMesh:
-    var mesh: BoxMesh = BoxMesh.new()
-    mesh.size = Vector3.ONE
-    return mesh
+    # Tüm chunk'lar TEK paylaşılan box mesh kullanır (her tip için yeni kaynak yaratmaz).
+    if _box_mesh_shared == null:
+        _box_mesh_shared = BoxMesh.new()
+        _box_mesh_shared.size = Vector3.ONE
+    return _box_mesh_shared
 
 func _cylinder_mesh() -> CylinderMesh:
-    var mesh: CylinderMesh = CylinderMesh.new()
-    mesh.top_radius = 1.0
-    mesh.bottom_radius = 1.0
-    mesh.height = 1.0
-    mesh.radial_segments = 8
-    mesh.rings = 1
-    return mesh
+    if _cylinder_mesh_shared == null:
+        _cylinder_mesh_shared = CylinderMesh.new()
+        _cylinder_mesh_shared.top_radius = 1.0
+        _cylinder_mesh_shared.bottom_radius = 1.0
+        _cylinder_mesh_shared.height = 1.0
+        _cylinder_mesh_shared.radial_segments = 8
+        _cylinder_mesh_shared.rings = 1
+    return _cylinder_mesh_shared
 
 func _scaled_transform(scale_vector: Vector3, origin: Vector3) -> Transform3D:
     var transform_basis: Basis = Basis()

@@ -37,7 +37,11 @@ func _process(delta: float) -> void:
         var alpha: float = 0.48 + sin(_pulse_time * 1.8) * 0.14
         _subtitle_label.modulate = Color(1.0, 0.86, 0.54, alpha)
     if _fps_label != null:
-        _fps_label.text = "FPS %d" % int(Engine.get_frames_per_second())
+        # FPS + teşhis: yüksek "dc" (draw call) => CPU/draw-call darboğazı,
+        # yüksek "kp" (bin primitive) ama düşük dc => GPU piksel/aydınlatma darboğazı.
+        var dc: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+        var prims: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
+        _fps_label.text = "FPS %d   dc %d   kp %d" % [int(Engine.get_frames_per_second()), dc, prims / 1000]
 
 func set_distance_to_exit(distance: float) -> void:
     if _distance_label != null:
