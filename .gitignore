@@ -37,6 +37,7 @@ gen_monster_sdxl.py
 tripo_*.png
 monster_*.png
 monster2_*.png
+user_monster.png
 
 # ---- Misc ----
 *.tmp
