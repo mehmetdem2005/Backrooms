@@ -23,6 +23,10 @@ var _path_index: int = 0
 var _repath_timer: float = 0.0
 var _mesh_root: Node3D
 var _material: StandardMaterial3D
+var _model: Node3D
+var _anim: AnimationPlayer
+var _current_anim: String = ""
+const MONSTER_MODEL: PackedScene = preload("res://assets/monster/monster_rigged.glb")
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _pulse_time: float = 0.0
 var _caught: bool = false
@@ -99,81 +103,56 @@ func get_player_noise_heard() -> float:
     return _last_player_noise
 
 func _build_visual() -> void:
+    # Karanlık et materyali (riglenmiş modele uygulanır). Fenerde koyu silüet, korku hissi.
     _material = StandardMaterial3D.new()
-    _material.albedo_color = Color(0.010, 0.008, 0.006, 1.0)
+    _material.albedo_color = Color(0.045, 0.040, 0.034, 1.0)
     _material.roughness = 1.0
+    _material.metallic = 0.0
     _material.emission_enabled = true
-    _material.emission = Color(0.12, 0.035, 0.018, 1.0)
-    _material.emission_energy_multiplier = 0.7
+    _material.emission = Color(0.10, 0.03, 0.018, 1.0)
+    _material.emission_energy_multiplier = 0.5
 
     var collision_shape: CapsuleShape3D = CapsuleShape3D.new()
-    collision_shape.radius = 0.30
-    collision_shape.height = 1.92
+    collision_shape.radius = 0.35
+    collision_shape.height = 2.0
     var collision: CollisionShape3D = CollisionShape3D.new()
     collision.name = "StalkerCollision"
     collision.shape = collision_shape
-    collision.position = Vector3(0.0, 0.96, 0.0)
+    collision.position = Vector3(0.0, 1.0, 0.0)
     add_child(collision)
 
     _mesh_root = Node3D.new()
     _mesh_root.name = "StalkerVisualRoot"
     add_child(_mesh_root)
 
-    var body_mesh: CapsuleMesh = CapsuleMesh.new()
-    body_mesh.radius = 0.27
-    body_mesh.height = 1.88
-    body_mesh.radial_segments = 12
-    body_mesh.rings = 6
-    var body: MeshInstance3D = MeshInstance3D.new()
-    body.name = "BodyShadow"
-    body.mesh = body_mesh
-    body.material_override = _material
-    body.position = Vector3(0.0, 0.96, 0.0)
-    _mesh_root.add_child(body)
+    # TripoSR ile üretilip Blender (bpy) ile riglenmiş DEV canavar (idle/walk/attack).
+    _model = MONSTER_MODEL.instantiate() as Node3D
+    _model.scale = Vector3(1.5, 1.5, 1.5)            # dev boy (~2.7m)
+    _model.rotation.y = PI                            # modelin önü (+Z) -> gövdenin önü (-Z)
+    _mesh_root.add_child(_model)
 
-    var arm_mesh: CylinderMesh = CylinderMesh.new()
-    arm_mesh.top_radius = 0.035
-    arm_mesh.bottom_radius = 0.055
-    arm_mesh.height = 1.35
-    arm_mesh.radial_segments = 8
-    var sides: Array[int] = [-1, 1]
-    for side: int in sides:
-        var arm: MeshInstance3D = MeshInstance3D.new()
-        arm.name = "LongArm_%d" % side
-        arm.mesh = arm_mesh
-        arm.material_override = _material
-        arm.position = Vector3(float(side) * 0.42, 0.86, -0.03)
-        arm.rotation.z = float(side) * 0.26
-        _mesh_root.add_child(arm)
-        _arm_nodes.append(arm)
+    _anim = _model.get_node_or_null("AnimationPlayer") as AnimationPlayer
+    var mi: MeshInstance3D = _find_mesh(_model)
+    if mi != null:
+        mi.material_override = _material
+    if _anim != null:
+        _anim.play("idle")
+        _current_anim = "idle"
 
-    var head_mesh: SphereMesh = SphereMesh.new()
-    head_mesh.radius = 0.22
-    head_mesh.height = 0.44
-    var head: MeshInstance3D = MeshInstance3D.new()
-    head.name = "WrongHead"
-    head.mesh = head_mesh
-    head.material_override = _material
-    head.position = Vector3(0.0, 1.82, -0.02)
-    head.scale = Vector3(0.72, 1.18, 0.62)
-    _mesh_root.add_child(head)
+func _find_mesh(node: Node) -> MeshInstance3D:
+    if node is MeshInstance3D:
+        return node as MeshInstance3D
+    for child: Node in node.get_children():
+        var found: MeshInstance3D = _find_mesh(child)
+        if found != null:
+            return found
+    return null
 
-    var eye_material: StandardMaterial3D = StandardMaterial3D.new()
-    eye_material.albedo_color = Color(1.0, 0.58, 0.12, 1.0)
-    eye_material.emission_enabled = true
-    eye_material.emission = Color(1.0, 0.30, 0.02, 1.0)
-    eye_material.emission_energy_multiplier = 4.0
-
-    for side: int in sides:
-        var eye_mesh: SphereMesh = SphereMesh.new()
-        eye_mesh.radius = 0.040
-        eye_mesh.height = 0.080
-        var eye: MeshInstance3D = MeshInstance3D.new()
-        eye.name = "Eye_%d" % side
-        eye.mesh = eye_mesh
-        eye.material_override = eye_material
-        eye.position = Vector3(float(side) * 0.085, 1.87, -0.19)
-        _mesh_root.add_child(eye)
+func _play_loco(anim_name: String) -> void:
+    if _anim == null or _current_anim == anim_name:
+        return
+    _current_anim = anim_name
+    _anim.play(anim_name, 0.25)
 
 func begin_grab(target: Node3D) -> void:
     # Canavar yakaladı: öldürmek yerine kollarını kaldırıp oyuncuyu tutar, yüzünü ona döner.
@@ -185,21 +164,18 @@ func begin_grab(target: Node3D) -> void:
         var flat_point: Vector3 = Vector3(target.global_position.x, global_position.y, target.global_position.z)
         if global_position.distance_to(flat_point) > 0.1:
             look_at(flat_point, Vector3.UP)
+    # Saldırı/yakalama animasyonu (tek sefer, son pozda kalır).
+    if _anim != null:
+        _current_anim = "attack"
+        _anim.play("attack")
+        _anim.speed_scale = 1.0
 
 func _animate_grab(delta: float) -> void:
     _grab_anim_t = min(_grab_anim_t + delta, 1.0)
-    var eased: float = _grab_anim_t * _grab_anim_t * (3.0 - 2.0 * _grab_anim_t)
-    for index: int in range(_arm_nodes.size()):
-        var arm: MeshInstance3D = _arm_nodes[index]
-        var side: float = -1.0 if index == 0 else 1.0
-        var target_x: float = lerp(0.0, -1.5, eased)              # kolları öne-yukarı kaldır
-        var target_z: float = lerp(side * 0.26, side * 0.10, eased)  # öne doğru birleştir (tutuş)
-        arm.rotation.x = lerp(arm.rotation.x, target_x, delta * 6.0)
-        arm.rotation.z = lerp(arm.rotation.z, target_z, delta * 6.0)
-        arm.position.y = lerp(arm.position.y, 0.86 + eased * 0.55, delta * 6.0)
+    # Animasyon AnimationPlayer'da (attack) oynuyor; burada hafif bir nefes/titreme.
     if _mesh_root != null:
         var st: float = Time.get_ticks_msec() * 0.001
-        _mesh_root.scale = Vector3(1.0, 1.0 + sin(st * 9.0) * 0.035, 1.0)
+        _mesh_root.scale = Vector3(1.0, 1.0 + sin(st * 9.0) * 0.02, 1.0)
 
 func _update_perception(delta: float) -> void:
     var self_cell: Vector3i = level_builder.world_to_grid(global_position)
@@ -366,10 +342,15 @@ func _update_visual(_delta: float) -> void:
     if _current_state == "CHASE":
         fear = max(fear, 0.82)
     if _material != null:
-        _material.emission_energy_multiplier = 0.55 + fear * 1.85 + sin(_pulse_time * 13.0) * 0.16
-    if _mesh_root != null:
-        var twitch: float = 1.0 + sin(_pulse_time * 19.0) * 0.018 * (1.0 + _awareness)
-        _mesh_root.scale = Vector3(twitch, 1.0 + sin(_pulse_time * 4.1) * 0.07 + _awareness * 0.08, 1.0)
+        _material.emission_energy_multiplier = 0.45 + fear * 1.6 + sin(_pulse_time * 13.0) * 0.12
+    # Lokomosyon animasyonu: hareket ederken yürü, dururken idle. Hız arttıkça hızlan (kovalama).
+    if _anim != null and not _grabbing:
+        if _current_speed > 0.4:
+            _play_loco("walk")
+            _anim.speed_scale = clamp(_current_speed / 2.6, 0.7, 2.0)
+        else:
+            _play_loco("idle")
+            _anim.speed_scale = 1.0
 
 func _set_state(new_state: String) -> void:
     if _current_state == new_state and _state_timer > 0.0:
