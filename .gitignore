@@ -26,11 +26,12 @@ game_src/.import/
 .venv/
 .venv-sd/
 TripoSR/
+UniRig/
 output/
 *.log
 install_tripo.sh
 install_sd.sh
-make_montage.py
+make_montage*.py
 gen_monster.py
 gen_monster_sdxl.py
 *montage*.png
