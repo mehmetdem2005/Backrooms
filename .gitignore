@@ -24,13 +24,17 @@ game_src/.import/
 
 # ---- TripoSR / ML asset generation (downloaded/generated, not source) ----
 .venv/
+.venv-sd/
 TripoSR/
 output/
 *.log
 install_tripo.sh
+install_sd.sh
 make_montage.py
+gen_monster.py
 *montage*.png
 tripo_*.png
+monster_*.png
 
 # ---- Misc ----
 *.tmp
