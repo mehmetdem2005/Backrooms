@@ -28,6 +28,9 @@ TripoSR/
 output/
 *.log
 install_tripo.sh
+make_montage.py
+*montage*.png
+tripo_*.png
 
 # ---- Misc ----
 *.tmp
