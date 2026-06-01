@@ -39,6 +39,12 @@ tripo_*.png
 monster_*.png
 monster2_*.png
 user_monster.png
+monster_mixamo.*
+monster_mixamo_obj.zip
+prep_mixamo.py
+reorient*.py
+reorient_*.png
+final_front.png
 
 # ---- Misc ----
 *.tmp
