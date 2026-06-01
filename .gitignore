@@ -59,3 +59,4 @@ install_bpy.sh
 game_src/_shot*.png
 game_src/_render.gd
 game_src/_t.gd
+game_src/_shot*.png.import
