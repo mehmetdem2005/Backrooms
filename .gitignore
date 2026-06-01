@@ -1,0 +1,28 @@
+# ---- Build tools & SDKs (downloaded at build time, not source) ----
+godot
+godot_editor.zip
+templates.tpz
+build-tools.zip
+platform-tools.zip
+cmdtools.zip
+android-sdk/
+
+# ---- Secrets / signing ----
+debug.keystore
+*.keystore
+*.jks
+
+# ---- Build output (delivered separately, large binaries) ----
+export/
+*.apk
+*.aab
+*.apk.idsig
+
+# ---- Godot import cache (regenerated on import) ----
+game_src/.godot/
+game_src/.import/
+
+# ---- Misc ----
+*.tmp
+r21.xml
+repo.xml
