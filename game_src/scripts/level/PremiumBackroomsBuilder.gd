@@ -533,21 +533,24 @@ func _append_trims(f: int, cell: Vector3i, center: Vector3, bucket: Dictionary) 
                 _bpush(bucket, "trim", _scaled_transform(Vector3(cell_size, 0.22, 0.12), center + Vector3(0.0, 0.18, zo)))
 
 func _place_columns(buckets: Dictionary) -> void:
-    # Odalarda düzenli ızgarada sütun (iç hücreler, kenarlardan 1 boşluk).
+    # Sadece GENİŞ odalara, kenardan 2 boşluk içeride, DÜZENLİ ızgarada sütun.
+    # Lamba (armatür) hücrelerine ASLA sütun konmaz (lambanın ortasından geçme sorunu).
     for entry: Dictionary in _rooms:
         var f: int = int(entry["floor"])
         var rect: Rect2i = entry["rect"] as Rect2i
-        if rect.size.x < 5 or rect.size.y < 5:
+        if rect.size.x < 7 or rect.size.y < 7:
             continue
         var base_y: float = -float(f) * FLOOR_GAP
         var z: int = rect.position.y + 2
-        while z < rect.position.y + rect.size.y - 2:
+        while z <= rect.position.y + rect.size.y - 3:
             var x: int = rect.position.x + 2
-            while x < rect.position.x + rect.size.x - 2:
-                if _get_cell(f, x, z) == 0:
+            while x <= rect.position.x + rect.size.x - 3:
+                var cell: Vector3i = Vector3i(x, f, z)
+                # açık hücre + lamba değil + başlangıç/çıkış değil
+                if _get_cell(f, x, z) == 0 and not _should_fixture(cell) and cell != start_cell and cell != exit_cell:
                     var c: Vector3 = Vector3((float(x) - float(grid_width - 1) * 0.5) * cell_size, base_y, (float(z) - float(grid_height - 1) * 0.5) * cell_size)
                     var bucket: Dictionary = _get_bucket(buckets, f, x, z)
-                    _bpush(bucket, "column", _scaled_transform(Vector3(0.5, wall_height, 0.5), c + Vector3(0.0, wall_height * 0.5, 0.0)))
+                    _bpush(bucket, "column", _scaled_transform(Vector3(0.55, wall_height, 0.55), c + Vector3(0.0, wall_height * 0.5, 0.0)))
                     if not bucket.has("_columns"):
                         bucket["_columns"] = []
                     bucket["_columns"].append(c)
@@ -778,9 +781,9 @@ func _build_exit_area() -> void:
 # ---------------------------------------------------------------- materyaller
 
 func _create_materials() -> void:
-    _wall_material = _make_pbr("wall_yellow_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.96, Vector3(1.6, 1.22, 1.0), true, true)
-    _floor_material = _make_pbr("carpet_old_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.95, Vector3(2.0, 2.0, 1.0), true, true)
-    _ceiling_material = _make_pbr("ceiling", Color(1.0, 0.98, 0.92, 1.0), 0.0, 0.85, Vector3(1.5, 1.5, 1.0), true)
+    _wall_material = _make_pbr("wall_yellow_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.96, Vector3(3.0, 2.2, 1.0), true, true)
+    _floor_material = _make_pbr("carpet_old_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.95, Vector3(8.0, 8.0, 1.0), true, true)
+    _ceiling_material = _make_pbr("ceiling", Color(1.0, 0.98, 0.92, 1.0), 0.0, 0.85, Vector3(2.0, 2.0, 1.0), true)
     _metal_material = _make_pbr("metal", Color(0.86, 0.87, 0.90, 1.0), 0.85, 0.5, Vector3(1.0, 1.0, 1.0), true, true)
     _concrete_material = _make_pbr("concrete", Color(0.93, 0.91, 0.86, 1.0), 0.0, 0.82, Vector3(1.0, 1.0, 1.0), true, true)
 

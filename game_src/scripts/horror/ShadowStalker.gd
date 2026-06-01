@@ -9,7 +9,7 @@ signal creature_step(world_position: Vector3, intensity: float)
 
 @export var stalk_speed: float = 2.95
 @export var investigate_speed: float = 3.2
-@export var chase_speed: float = 4.95
+@export var chase_speed: float = 5.4
 @export var catch_distance: float = 1.15
 @export var repath_interval: float = 0.28
 @export var hearing_multiplier: float = 1.5
@@ -127,8 +127,8 @@ func _build_visual() -> void:
 
     # TripoSR ile üretilip Blender (bpy) ile riglenmiş DEV canavar (idle/walk/attack).
     _model = MONSTER_MODEL.instantiate() as Node3D
-    _model.scale = Vector3(1.5, 1.5, 1.5)            # dev boy (~2.7m)
-    _model.rotation.y = PI                            # modelin önü (+Z) -> gövdenin önü (-Z)
+    _model.scale = Vector3(1.6, 1.6, 1.6)            # dev boy (~2.9m)
+    # Yön her karede oyuncuya doğru ayarlanır (_update_visual). Başlangıç 0.
     _mesh_root.add_child(_model)
 
     _anim = _model.get_node_or_null("AnimationPlayer") as AnimationPlayer
@@ -136,6 +136,10 @@ func _build_visual() -> void:
     if mi != null:
         mi.material_override = _material
     if _anim != null:
+        # Lokomosyon animasyonları DÖNGÜ olmalı (yoksa bir kez oynayıp donar = "dümdüz").
+        for loop_name: String in ["idle", "walk"]:
+            if _anim.has_animation(loop_name):
+                _anim.get_animation(loop_name).loop_mode = Animation.LOOP_LINEAR
         _anim.play("idle")
         _current_anim = "idle"
 
@@ -243,49 +247,14 @@ func _predicted_player_cell() -> Vector3i:
     return level_builder.world_to_grid(lead_world)
 
 func _update_state_logic(_delta: float) -> void:
+    # AMANSIZ TAKİP: nerede olursan ol, daima oyuncuya yol bul (katlar arası dahil).
     var player_cell: Vector3i = level_builder.world_to_grid(player.global_position)
-    if _current_state == "STALK":
-        if _state_timer > lerp(0.7, 0.35, _aggression) or _path.size() == 0:
-            # Neredeyse her zaman DOĞRUDAN oyuncuya yönelir (seni aktif arar/bulur),
-            # çok seyrek küçük bir sapma ile robotik durmaz.
-            if _rng.randf() < 0.9:
-                _target_cell = player_cell
-            else:
-                _target_cell = level_builder.get_random_open_cell_near(player_cell, 1, 3, _rng)
-            _request_path_to(_target_cell)
-            _state_timer = 0.0
-        if _ambush_cooldown <= 0.0 and _awareness > 0.18 and global_position.distance_to(player.global_position) > 16.0:
-            _set_state("AMBUSH")
-    elif _current_state == "INVESTIGATE":
-        if _state_timer < 0.1:
-            _request_path_to(_last_known_player_cell)
-            scare_pulse.emit(level_builder.grid_to_world(_last_known_player_cell, 1.2), 0.45)
-        if _arrived_to_cell(_last_known_player_cell) or _state_timer > 5.0:
-            _set_state("SEARCH")
-    elif _current_state == "SEARCH":
-        if _state_timer > 1.0 or _path.size() == 0:
-            _target_cell = level_builder.get_random_open_cell_near(_last_known_player_cell, 1, 7, _rng)
-            _request_path_to(_target_cell)
-            _state_timer = 0.0
-        if _awareness < 0.08 and _lost_timer > lerp(6.0, 2.5, _aggression):
-            _set_state("STALK")
-    elif _current_state == "CHASE":
-        if _repath_timer <= 0.0:
-            _repath_timer = repath_interval
-            _request_path_to(_predicted_player_cell())
-        if _lost_timer > lerp(3.5, 6.0, _aggression):
-            _set_state("SEARCH")
-    elif _current_state == "AMBUSH":
-        if _state_timer < 0.1:
-            _target_cell = level_builder.get_ambush_cell_around(player_cell, _rng)
-            _request_path_to(_target_cell)
-            scare_pulse.emit(level_builder.grid_to_world(_target_cell, 1.2), 0.60)
-        if _arrived_to_cell(_target_cell) or _state_timer > 4.0:
-            _ambush_cooldown = _rng.randf_range(11.0, 16.0) * (1.0 - _aggression * 0.4)
-            # çok uzaklaştıysa oyuncunun yakınına yeniden konumlan ("her zaman geri gelir")
-            if global_position.distance_to(player.global_position) > 42.0 and _reposition_cooldown <= 0.0:
-                _phase_reposition_near_player(player_cell)
-            _set_state("STALK")
+    if _current_state != "CHASE":
+        _set_state("CHASE")
+    if _repath_timer <= 0.0 or _path.size() == 0:
+        _repath_timer = repath_interval
+        _request_path_to(_predicted_player_cell())
+        _last_known_player_cell = player_cell
 
 func _request_path_to(goal: Vector3i) -> void:
     if level_builder == null:
@@ -308,22 +277,14 @@ func _follow_path(delta: float) -> void:
         _path_index += 1
         return
 
-    var speed: float = stalk_speed
-    if _current_state == "INVESTIGATE" or _current_state == "SEARCH" or _current_state == "AMBUSH":
-        speed = investigate_speed
-    if _current_state == "CHASE":
-        speed = chase_speed + _awareness * 0.8 + _aggression * 0.6
-
-    var desired: Vector3 = flat_to_target.normalized() * speed
-    velocity.x = move_toward(velocity.x, desired.x, 10.0 * delta)
-    velocity.z = move_toward(velocity.z, desired.z, 10.0 * delta)
+    # Her zaman amansız kovalama: sabit hız (oyuncunun koşusundan az daha yavaş).
+    var desired: Vector3 = flat_to_target.normalized() * chase_speed
+    velocity.x = move_toward(velocity.x, desired.x, 12.0 * delta)
+    velocity.z = move_toward(velocity.z, desired.z, 12.0 * delta)
     velocity.y = -0.2
     move_and_slide()
     _current_speed = Vector2(velocity.x, velocity.z).length()
-
-    var look_target: Vector3 = global_position + Vector3(velocity.x, 0.0, velocity.z)
-    if global_position.distance_to(look_target) > 0.05:
-        look_at(look_target, Vector3.UP)
+    # Yön (gövde döndürmüyoruz; model _update_visual'da oyuncuya bakar).
 
 func _update_steps(delta: float) -> void:
     if _current_speed < 0.6:
@@ -334,7 +295,7 @@ func _update_steps(delta: float) -> void:
         var intensity: float = clamp(_current_speed / chase_speed, 0.3, 1.0)
         creature_step.emit(global_position, intensity)
 
-func _update_visual(_delta: float) -> void:
+func _update_visual(delta: float) -> void:
     var distance: float = 99.0
     if player != null:
         distance = global_position.distance_to(player.global_position)
@@ -343,6 +304,13 @@ func _update_visual(_delta: float) -> void:
         fear = max(fear, 0.82)
     if _material != null:
         _material.emission_energy_multiplier = 0.45 + fear * 1.6 + sin(_pulse_time * 13.0) * 0.12
+    # Modelin önü (+Z) DAİMA oyuncuya bakar (ürkütücü + yön doğru).
+    if _model != null and player != null:
+        var d: Vector3 = player.global_position - global_position
+        d.y = 0.0
+        if d.length() > 0.05:
+            var target_yaw: float = atan2(d.x, d.z)
+            _model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, clamp(delta * 9.0, 0.0, 1.0))
     # Lokomosyon animasyonu: hareket ederken yürü, dururken idle. Hız arttıkça hızlan (kovalama).
     if _anim != null and not _grabbing:
         if _current_speed > 0.4:

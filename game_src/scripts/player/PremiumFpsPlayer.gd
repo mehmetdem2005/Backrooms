@@ -32,6 +32,10 @@ var _head: Node3D
 var _camera: Camera3D
 var _flashlight: SpotLight3D
 var _fill_light: OmniLight3D
+var _vision_light: OmniLight3D       # daima açık, çok sönük -> kapkaranlıkta bile yakını seçebilme
+var _flashlight_model: Node3D        # elde tutulan fener modeli (viewmodel)
+var _lens_material: StandardMaterial3D
+var _fl_sway: Vector2 = Vector2.ZERO
 var _pitch: float = 0.0
 var _flashlight_enabled: bool = true
 var _bob_time: float = 0.0
@@ -208,31 +212,87 @@ func _build_body() -> void:
     _head.add_child(_camera)
     _camera.current = true
 
+    # Elde tutulan fener modeli (viewmodel) — ışık bunun ucundan çıkar.
+    _build_flashlight_model()
+
+    # AAA huzme: yumuşak kenar (cookie + açı atten.), uzun menzilde yumuşaya yumuşaya azalan parlaklık.
     _flashlight = SpotLight3D.new()
     _flashlight.name = "PremiumFlashlight"
-    _flashlight.light_color = Color(1.0, 0.94, 0.78, 1.0)
-    _flashlight.light_energy = 4.2
-    _flashlight.spot_range = 26.0
-    _flashlight.spot_angle = 38.0
-    _flashlight.spot_angle_attenuation = 1.35
-    _flashlight.light_specular = 0.6
-    _flashlight.shadow_enabled = false  # mobil performans: fener gölgesi kapalı
-    _flashlight.shadow_bias = 0.04
-    # Gerçek fener hissi: sert yuvarlak yerine yumuşak kenarlı, hafif dokulu huzme (cookie)
+    _flashlight.light_color = Color(1.0, 0.95, 0.82, 1.0)
+    _flashlight.light_energy = 6.0
+    _flashlight.spot_range = 34.0
+    _flashlight.spot_angle = 30.0
+    _flashlight.spot_angle_attenuation = 1.8     # merkez parlak, kenar yumuşak
+    _flashlight.spot_attenuation = 1.1           # mesafeyle yumuşak sönme
+    _flashlight.light_specular = 0.5
+    _flashlight.shadow_enabled = false
     _flashlight.light_projector = _make_flashlight_cookie()
+    # Fenerin ucundan (elin önünden) yayılır
+    _flashlight.position = Vector3(0.26, -0.20, -0.55)
     _camera.add_child(_flashlight)
 
-    # Yakın dolgu ışığı çok kısık: zeminde belirgin yuvarlak parlama yapmaz, sadece
-    # hemen önünü siyahlıktan kurtarır.
+    # Yakın dolgu (huzme açıkken hemen önü siyahlıktan kurtarır)
     _fill_light = OmniLight3D.new()
     _fill_light.name = "FlashlightFill"
-    _fill_light.light_color = Color(1.0, 0.92, 0.74, 1.0)
-    _fill_light.light_energy = 0.35
-    _fill_light.omni_range = 3.0
+    _fill_light.light_color = Color(1.0, 0.93, 0.76, 1.0)
+    _fill_light.light_energy = 0.4
+    _fill_light.omni_range = 3.5
     _fill_light.omni_attenuation = 2.0
     _fill_light.shadow_enabled = false
     _fill_light.position = Vector3(0.0, -0.05, -0.5)
     _camera.add_child(_fill_light)
+
+    # KALİTELİ KARANLIK: daima açık, çok sönük görüş ışığı → fener kapalıyken bile
+    # yakın yüzeyler hafifçe seçilir (kapkaranlık kare değil, göz alışmış karanlık).
+    _vision_light = OmniLight3D.new()
+    _vision_light.name = "VisionAdapt"
+    _vision_light.light_color = Color(0.62, 0.66, 0.78, 1.0)
+    _vision_light.light_energy = 0.16
+    _vision_light.omni_range = 6.5
+    _vision_light.omni_attenuation = 2.4
+    _vision_light.shadow_enabled = false
+    _vision_light.position = Vector3(0.0, 0.0, 0.0)
+    _camera.add_child(_vision_light)
+
+func _build_flashlight_model() -> void:
+    _flashlight_model = Node3D.new()
+    _flashlight_model.name = "FlashlightViewmodel"
+    _flashlight_model.position = Vector3(0.26, -0.22, -0.42)
+    _flashlight_model.rotation = Vector3(deg_to_rad(-6.0), deg_to_rad(-4.0), 0.0)
+    _camera.add_child(_flashlight_model)
+
+    var body_mat: StandardMaterial3D = StandardMaterial3D.new()
+    body_mat.albedo_color = Color(0.07, 0.07, 0.08, 1.0)
+    body_mat.metallic = 0.85
+    body_mat.roughness = 0.35
+
+    var body: MeshInstance3D = MeshInstance3D.new()
+    var bm: CylinderMesh = CylinderMesh.new()
+    bm.top_radius = 0.022; bm.bottom_radius = 0.026; bm.height = 0.20; bm.radial_segments = 16
+    body.mesh = bm; body.material_override = body_mat
+    body.rotation.x = deg_to_rad(90.0)        # silindir ekseni Y -> Z (öne uzanır)
+    _flashlight_model.add_child(body)
+
+    var head: MeshInstance3D = MeshInstance3D.new()
+    var hm: CylinderMesh = CylinderMesh.new()
+    hm.top_radius = 0.046; hm.bottom_radius = 0.028; hm.height = 0.06; hm.radial_segments = 16
+    head.mesh = hm; head.material_override = body_mat
+    head.rotation.x = deg_to_rad(90.0)
+    head.position = Vector3(0.0, 0.0, -0.13)
+    _flashlight_model.add_child(head)
+
+    _lens_material = StandardMaterial3D.new()
+    _lens_material.albedo_color = Color(1.0, 0.96, 0.80, 1.0)
+    _lens_material.emission_enabled = true
+    _lens_material.emission = Color(1.0, 0.95, 0.78, 1.0)
+    _lens_material.emission_energy_multiplier = 6.0
+    var lens: MeshInstance3D = MeshInstance3D.new()
+    var lm: CylinderMesh = CylinderMesh.new()
+    lm.top_radius = 0.042; lm.bottom_radius = 0.042; lm.height = 0.012; lm.radial_segments = 16
+    lens.mesh = lm; lens.material_override = _lens_material
+    lens.rotation.x = deg_to_rad(90.0)
+    lens.position = Vector3(0.0, 0.0, -0.165)
+    _flashlight_model.add_child(lens)
 
 func _make_flashlight_cookie() -> Texture2D:
     var size: int = 256
@@ -335,15 +395,20 @@ func _update_flashlight(delta: float) -> void:
 
     _flashlight.visible = _flashlight_enabled
     _fill_light.visible = _flashlight_enabled
+    var lens_glow: float = 0.0
     if _flashlight_enabled:
         var stress_flicker: float = 1.0 - stress_level * 0.12 + sin(Time.get_ticks_msec() * 0.021) * stress_level * 0.10
-        var battery: float = lerp(0.35, 1.0, flashlight_energy)
+        var battery: float = lerp(0.40, 1.0, flashlight_energy)
         # düşük pilde rastgele kırpışma
         if flashlight_energy < 0.2 and sin(Time.get_ticks_msec() * 0.05) > 0.4:
             battery *= 0.4
-        _flashlight.light_energy = 4.2 * battery * stress_flicker
-        _flashlight.spot_range = lerp(12.0, 27.0, flashlight_energy)
-        _fill_light.light_energy = 0.35 * battery
+        _flashlight.light_energy = 6.0 * battery * stress_flicker
+        _flashlight.spot_range = lerp(18.0, 36.0, flashlight_energy)   # pil azaldıkça menzil kısalır
+        _fill_light.light_energy = 0.4 * battery
+        lens_glow = 6.5 * battery * stress_flicker
+    # Lens parıltısı (fener kapalıyken sönük)
+    if _lens_material != null:
+        _lens_material.emission_energy_multiplier = move_toward(_lens_material.emission_energy_multiplier, lens_glow, delta * 30.0)
 
 func _update_camera_motion(delta: float) -> void:
     var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()

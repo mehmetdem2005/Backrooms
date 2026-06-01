@@ -25,7 +25,8 @@ void fragment() {
 
     // KALİTELİ KARANLIK: fener kapalıyken kenarlar kararır ama tam siyaha gitmez;
     // merkezde gözün alıştığı dim bir görüş alanı kalır (kapkaranlık değil).
-    float dark_edge = smoothstep(vision_radius * 0.5, vision_radius * 1.25, dist);
+    // Yumuşak, kademeli vinyet karanlığı (sert kare/halka değil)
+    float dark_edge = smoothstep(vision_radius * 0.30, vision_radius * 1.45, dist);
     float dark_amount = darkness * dark_edge;
 
     float grain = hash(uv * vec2(1280.0, 720.0) + time * 41.0) - 0.5;
@@ -43,11 +44,12 @@ void fragment() {
                   + max(0.0, grain) * (0.030 + darkness * 0.04)
                   + scan + pulse + breath;
 
-    float alpha = clamp(0.09 + vignette * 0.42 + fear * 0.18 + dark_amount * 0.82 + breath, 0.0, 0.80);
+    // Daha düşük karanlık katkısı: gerçek "görüş ışığı" alttan görünsün, kapkaranlık olmasın
+    float alpha = clamp(0.08 + vignette * 0.40 + fear * 0.18 + dark_amount * 0.48 + breath, 0.0, 0.66);
     vec3 col = tint * overlay;
 
-    // Karanlıkta koyu ama tam siyah değil (dim görüş korunur)
-    col = mix(col, vec3(0.0), dark_amount * 0.6);
+    // Karanlıkta koyu ama tam siyah değil (göz alışmış dim görüş korunur)
+    col = mix(col, vec3(0.0), dark_amount * 0.38);
 
     // JUMPSCARE: önce kısa beyaz patlama, sonra siyah kapanış
     col = mix(col, vec3(1.0, 0.96, 0.93), flash);
