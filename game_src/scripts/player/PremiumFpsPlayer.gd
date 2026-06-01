@@ -180,6 +180,12 @@ func _toggle_flashlight() -> void:
     flashlight_clicked.emit(global_position)
 
 func _build_body() -> void:
+    # Rampalarda (kat geçişi) güvenli iniş/çıkış için zemin yapışması ve eğim toleransı.
+    up_direction = Vector3.UP
+    floor_max_angle = deg_to_rad(52.0)
+    floor_snap_length = 0.8
+    floor_stop_on_slope = false
+    floor_constant_speed = true
     var capsule_shape: CapsuleShape3D = CapsuleShape3D.new()
     capsule_shape.radius = 0.33
     capsule_shape.height = 1.52

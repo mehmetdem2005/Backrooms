@@ -12,8 +12,8 @@ const AUDIO_DIRECTOR_SCRIPT: Script = preload("res://scripts/horror/AudioDirecto
 const JUMPSCARE_SCRIPT: Script = preload("res://scripts/horror/JumpscareOverlay.gd")
 
 @export var world_seed: int = 463063
-@export var maze_width: int = 49
-@export var maze_height: int = 49
+@export var maze_width: int = 33
+@export var maze_height: int = 33
 @export var premium_mode: bool = true
 @export var spawn_stalker: bool = true
 
@@ -146,8 +146,9 @@ func _create_level() -> void:
     level_builder.world_seed = world_seed
     level_builder.grid_width = maze_width
     level_builder.grid_height = maze_height
-    level_builder.room_count = 30
-    level_builder.detail_density = 1.45
+    level_builder.room_count = 13
+    level_builder.detail_density = 1.0
+    level_builder.floors = 2
     add_child(level_builder)
     level_builder.generate()
 

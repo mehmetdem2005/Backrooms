@@ -278,8 +278,8 @@ func _update_creature_voice(delta: float) -> void:
 func _play_random_event() -> void:
     if player == null or level_builder == null:
         return
-    var player_cell: Vector2i = level_builder.world_to_grid(player.global_position)
-    var event_cell: Vector2i = level_builder.get_random_open_cell_near(player_cell, 4, 13, _rng)
+    var player_cell: Vector3i = level_builder.world_to_grid(player.global_position)
+    var event_cell: Vector3i = level_builder.get_random_open_cell_near(player_cell, 4, 13, _rng)
     var event_position: Vector3 = level_builder.grid_to_world(event_cell, 1.55)
     var roll: float = _rng.randf()
     if roll < 0.34:

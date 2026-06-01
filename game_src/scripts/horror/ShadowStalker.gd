@@ -18,7 +18,7 @@ signal creature_step(world_position: Vector3, intensity: float)
 var level_builder
 var player
 
-var _path: Array[Vector2i] = []
+var _path: Array[Vector3i] = []
 var _path_index: int = 0
 var _repath_timer: float = 0.0
 var _mesh_root: Node3D
@@ -34,8 +34,8 @@ var _aggression: float = 0.0          # zamanla ve gördükçe artar → "sürek
 var _state_timer: float = 0.0
 var _lost_timer: float = 0.0
 var _current_state: String = "STALK"
-var _target_cell: Vector2i = Vector2i.ZERO
-var _last_known_player_cell: Vector2i = Vector2i.ZERO
+var _target_cell: Vector3i = Vector3i.ZERO
+var _last_known_player_cell: Vector3i = Vector3i.ZERO
 var _last_player_noise: float = 0.0
 var _ambush_cooldown: float = 5.0
 var _reposition_cooldown: float = 7.0
@@ -45,6 +45,10 @@ var _current_speed: float = 0.0
 
 func _ready() -> void:
     _rng.randomize()
+    # Rampalarda (kat geçişi) düzgün iniş için zemin yapışması.
+    up_direction = Vector3.UP
+    floor_max_angle = deg_to_rad(55.0)
+    floor_snap_length = 0.8
     _build_visual()
     _set_state("STALK")
 
@@ -198,8 +202,8 @@ func _animate_grab(delta: float) -> void:
         _mesh_root.scale = Vector3(1.0, 1.0 + sin(st * 9.0) * 0.035, 1.0)
 
 func _update_perception(delta: float) -> void:
-    var self_cell: Vector2i = level_builder.world_to_grid(global_position)
-    var player_cell: Vector2i = level_builder.world_to_grid(player.global_position)
+    var self_cell: Vector3i = level_builder.world_to_grid(global_position)
+    var player_cell: Vector3i = level_builder.world_to_grid(player.global_position)
     var distance_to_player: float = global_position.distance_to(player.global_position)
 
     var visibility: float = 0.5
@@ -250,9 +254,9 @@ func _update_perception(delta: float) -> void:
     elif heard and _awareness > 0.16 and _current_state != "CHASE":
         _set_state("INVESTIGATE")
 
-func _predicted_player_cell() -> Vector2i:
+func _predicted_player_cell() -> Vector3i:
     # lead-pursuit: oyuncunun gittiği yöne bir miktar önden hedefle
-    var player_cell: Vector2i = level_builder.world_to_grid(player.global_position)
+    var player_cell: Vector3i = level_builder.world_to_grid(player.global_position)
     var pv: Vector3 = Vector3.ZERO
     if "velocity" in player:
         pv = player.velocity
@@ -263,7 +267,7 @@ func _predicted_player_cell() -> Vector2i:
     return level_builder.world_to_grid(lead_world)
 
 func _update_state_logic(_delta: float) -> void:
-    var player_cell: Vector2i = level_builder.world_to_grid(player.global_position)
+    var player_cell: Vector3i = level_builder.world_to_grid(player.global_position)
     if _current_state == "STALK":
         if _state_timer > lerp(0.7, 0.35, _aggression) or _path.size() == 0:
             # Neredeyse her zaman DOĞRUDAN oyuncuya yönelir (seni aktif arar/bulur),
@@ -307,11 +311,11 @@ func _update_state_logic(_delta: float) -> void:
                 _phase_reposition_near_player(player_cell)
             _set_state("STALK")
 
-func _request_path_to(goal: Vector2i) -> void:
+func _request_path_to(goal: Vector3i) -> void:
     if level_builder == null:
         return
-    var start: Vector2i = level_builder.world_to_grid(global_position)
-    _path = level_builder.get_grid_path(start, goal, 2200)
+    var start: Vector3i = level_builder.world_to_grid(global_position)
+    _path = level_builder.get_grid_path(start, goal, 4000)
     _path_index = 0
 
 func _follow_path(delta: float) -> void:
@@ -321,7 +325,7 @@ func _follow_path(delta: float) -> void:
         _current_speed = Vector2(velocity.x, velocity.z).length()
         return
 
-    var target_position: Vector3 = level_builder.grid_to_world(_path[_path_index], global_position.y)
+    var target_position: Vector3 = level_builder.grid_to_world(_path[_path_index], 0.0)
     var flat_to_target: Vector3 = target_position - global_position
     flat_to_target.y = 0.0
     if flat_to_target.length() < 0.35:
@@ -388,20 +392,21 @@ func _state_to_turkish(state_name: String) -> String:
             return "Pusu kuruyor"
     return state_name
 
-func _arrived_to_cell(cell: Vector2i) -> bool:
-    var current: Vector2i = level_builder.world_to_grid(global_position)
+func _arrived_to_cell(cell: Vector3i) -> bool:
+    var current: Vector3i = level_builder.world_to_grid(global_position)
     return current == cell or _cell_distance(current, cell) <= 1.5
 
-func _cell_distance(a: Vector2i, b: Vector2i) -> float:
+func _cell_distance(a: Vector3i, b: Vector3i) -> float:
     var dx: int = a.x - b.x
-    var dy: int = a.y - b.y
-    return sqrt(float(dx * dx + dy * dy))
+    var dz: int = a.z - b.z
+    var df: int = (a.y - b.y) * 6
+    return sqrt(float(dx * dx + dz * dz + df * df))
 
-func _phase_reposition_near_player(player_cell: Vector2i) -> void:
-    var candidate: Vector2i = level_builder.get_ambush_cell_around(player_cell, _rng)
+func _phase_reposition_near_player(player_cell: Vector3i) -> void:
+    var candidate: Vector3i = level_builder.get_ambush_cell_around(player_cell, _rng)
     if candidate == player_cell:
         return
-    global_position = level_builder.grid_to_world(candidate, global_position.y)
+    global_position = level_builder.grid_to_world(candidate, 0.2)
     _path.clear()
     _reposition_cooldown = _rng.randf_range(10.0, 15.0)
     scare_pulse.emit(global_position + Vector3(0.0, 1.1, 0.0), 0.90)
