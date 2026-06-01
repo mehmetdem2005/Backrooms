@@ -60,3 +60,7 @@ game_src/_shot*.png
 game_src/_render.gd
 game_src/_t.gd
 game_src/_shot*.png.import
+gen_tex.py
+acg.json
+carpet_candidates.png
+tex_preview.png
