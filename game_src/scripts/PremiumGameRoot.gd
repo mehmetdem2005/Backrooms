@@ -163,8 +163,9 @@ func _create_chunk_streamer() -> void:
     chunk_streamer = ChunkStreamer.new()
     chunk_streamer.name = "ChunkStreamer"
     add_child(chunk_streamer)
-    # Görüş mesafesi (performans için biraz kısıldı): ~2 chunk yarıçapı
-    var distance: float = float(level_builder.chunk_size) * level_builder.cell_size * 2.0
+    # Görüş mesafesi sise hizalandı: sis ~50m'de tamamen kapatıyor, ötesini çizmek boşa.
+    # (Önceki 64m, sisin arkasındaki görünmez geometriyi de çiziyordu → boşa draw call.)
+    var distance: float = float(level_builder.chunk_size) * level_builder.cell_size * 1.65
     chunk_streamer.setup(player, level_builder.chunks, distance)
 
 func _create_lighting() -> void:
@@ -172,7 +173,7 @@ func _create_lighting() -> void:
     light_manager.name = "SmartFluorescentLightManager"
     light_manager.player = player
     light_manager.fixture_positions = level_builder.fixture_positions
-    light_manager.max_active_lights = 6
+    light_manager.max_active_lights = 4
     light_manager.enable_near_shadows = false
     add_child(light_manager)
 
