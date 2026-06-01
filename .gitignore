@@ -25,6 +25,7 @@ game_src/.import/
 # ---- TripoSR / ML asset generation (downloaded/generated, not source) ----
 .venv/
 .venv-sd/
+.venv-bpy/
 TripoSR/
 UniRig/
 output/
@@ -50,3 +51,8 @@ final_front.png
 *.tmp
 r21.xml
 repo.xml
+rig_monster.py
+preview_rig.py
+monster_rigged.glb
+rig_walk_preview.png
+install_bpy.sh
