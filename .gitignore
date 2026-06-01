@@ -53,6 +53,6 @@ r21.xml
 repo.xml
 rig_monster.py
 preview_rig.py
-monster_rigged.glb
+/monster_rigged.glb
 rig_walk_preview.png
 install_bpy.sh
