@@ -32,9 +32,11 @@ install_tripo.sh
 install_sd.sh
 make_montage.py
 gen_monster.py
+gen_monster_sdxl.py
 *montage*.png
 tripo_*.png
 monster_*.png
+monster2_*.png
 
 # ---- Misc ----
 *.tmp
