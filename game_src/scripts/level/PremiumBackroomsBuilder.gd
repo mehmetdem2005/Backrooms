@@ -778,11 +778,11 @@ func _build_exit_area() -> void:
 # ---------------------------------------------------------------- materyaller
 
 func _create_materials() -> void:
-    _wall_material = _make_pbr("wall_yellow_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.96, Vector3(1.6, 1.22, 1.0), true)
-    _floor_material = _make_pbr("carpet_old_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.95, Vector3(2.0, 2.0, 1.0), true)
-    _ceiling_material = _make_pbr("ceiling", Color(1.0, 0.98, 0.92, 1.0), 0.0, 0.85, Vector3(1.5, 1.5, 1.0), false)
-    _metal_material = _make_pbr("metal", Color(0.82, 0.83, 0.86, 1.0), 0.92, 0.5, Vector3(1.0, 1.0, 1.0), true)
-    _concrete_material = _make_pbr("concrete", Color(0.93, 0.91, 0.86, 1.0), 0.0, 0.82, Vector3(1.0, 1.0, 1.0), true)
+    _wall_material = _make_pbr("wall_yellow_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.96, Vector3(1.6, 1.22, 1.0), true, true)
+    _floor_material = _make_pbr("carpet_old_dirty", Color(1.0, 0.99, 0.95, 1.0), 0.0, 0.95, Vector3(2.0, 2.0, 1.0), true, true)
+    _ceiling_material = _make_pbr("ceiling", Color(1.0, 0.98, 0.92, 1.0), 0.0, 0.85, Vector3(1.5, 1.5, 1.0), true)
+    _metal_material = _make_pbr("metal", Color(0.86, 0.87, 0.90, 1.0), 0.85, 0.5, Vector3(1.0, 1.0, 1.0), true, true)
+    _concrete_material = _make_pbr("concrete", Color(0.93, 0.91, 0.86, 1.0), 0.0, 0.82, Vector3(1.0, 1.0, 1.0), true, true)
 
     _trim_material = _make_flat(Color(0.40, 0.33, 0.18, 1.0), 0.7)
     _ramp_material = _make_pbr("concrete", Color(0.88, 0.86, 0.81, 1.0), 0.0, 0.85, Vector3(1.0, 1.0, 1.0), false)
@@ -806,7 +806,7 @@ func _create_materials() -> void:
     emissive.emission_energy_multiplier = 4.6
     _emissive_material = emissive
 
-func _make_pbr(set_name: String, tint: Color, metallic_value: float, rough_value: float, uv_scale: Vector3, use_normal: bool) -> StandardMaterial3D:
+func _make_pbr(set_name: String, tint: Color, metallic_value: float, rough_value: float, uv_scale: Vector3, use_normal: bool, use_roughness: bool = false) -> StandardMaterial3D:
     var m: StandardMaterial3D = StandardMaterial3D.new()
     m.albedo_color = tint
     var albedo: Texture2D = _load_tex("res://textures/%s_albedo.png" % set_name)
@@ -818,7 +818,16 @@ func _make_pbr(set_name: String, tint: Color, metallic_value: float, rough_value
             m.normal_enabled = true
             m.normal_texture = normal
             m.normal_scale = 1.0
-    m.roughness = rough_value
+    # PolyHaven PBR pürüzlülük haritası (varsa) → gerçekçi yüzey parlaklığı
+    if use_roughness:
+        var rough_tex: Texture2D = _load_tex("res://textures/%s_roughness.png" % set_name)
+        if rough_tex != null:
+            m.roughness_texture = rough_tex
+            m.roughness = 1.0
+        else:
+            m.roughness = rough_value
+    else:
+        m.roughness = rough_value
     m.metallic = metallic_value
     m.uv1_scale = uv_scale
     m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
