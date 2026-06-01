@@ -126,8 +126,8 @@ func _generate_floor(f: int) -> void:
         var b: Vector2i = _room_center(placed[i])
         _carve_corridor(f, a, b)
 
-    # Ekstra bağlantılar → döngüler / kavşaklar / yol ayrımları.
-    var extra: int = int(placed.size() / 2) + 1
+    # Ekstra bağlantılar → BOL döngü / kavşak / yol ayrımı (labirent hissi).
+    var extra: int = placed.size() + 2
     for _e: int in range(extra):
         if placed.size() < 2:
             break
@@ -136,8 +136,8 @@ func _generate_floor(f: int) -> void:
         if a2 != b2:
             _carve_corridor(f, a2, b2)
 
-    # Birkaç çıkmaz koridor (keşif hissi).
-    for _d: int in range(3):
+    # Çıkmaz koridorlar (keşif/labirent hissi).
+    for _d: int in range(6):
         if placed.is_empty():
             break
         var src: Vector2i = _room_center(placed[_rng.randi_range(0, placed.size() - 1)])

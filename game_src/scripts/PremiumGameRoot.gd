@@ -146,7 +146,7 @@ func _create_level() -> void:
     level_builder.world_seed = world_seed
     level_builder.grid_width = maze_width
     level_builder.grid_height = maze_height
-    level_builder.room_count = 13
+    level_builder.room_count = 16
     level_builder.detail_density = 1.0
     level_builder.floors = 2
     add_child(level_builder)
