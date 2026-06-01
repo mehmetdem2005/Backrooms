@@ -264,27 +264,45 @@ func _request_path_to(goal: Vector3i) -> void:
     _path_index = 0
 
 func _follow_path(delta: float) -> void:
-    if _path.size() == 0 or _path_index >= _path.size():
+    if _path.is_empty() or _path_index >= _path.size():
         velocity = velocity.move_toward(Vector3.ZERO, 7.0 * delta)
         move_and_slide()
         _current_speed = Vector2(velocity.x, velocity.z).length()
         return
 
+    # YOL DÜZLEŞTİRME (string-pulling): aynı kattaki, görüş hattı olan EN UZAK ara noktaya
+    # yönel → ızgara zikzakı yerine açık alandan/köşelerden doğal, düz hareket.
+    var cur_cell: Vector3i = level_builder.world_to_grid(global_position)
+    var look: int = _path_index
+    while look + 1 < _path.size() and _path[look + 1].y == cur_cell.y and level_builder.has_grid_line_of_sight(cur_cell, _path[look + 1], 18):
+        look += 1
+    _path_index = look
+
     var target_position: Vector3 = level_builder.grid_to_world(_path[_path_index], 0.0)
     var flat_to_target: Vector3 = target_position - global_position
     flat_to_target.y = 0.0
-    if flat_to_target.length() < 0.35:
+    if flat_to_target.length() < 0.5:
         _path_index += 1
-        return
+        if _path_index >= _path.size():
+            velocity = velocity.move_toward(Vector3.ZERO, 7.0 * delta)
+            move_and_slide()
+            _current_speed = Vector2(velocity.x, velocity.z).length()
+            return
+        target_position = level_builder.grid_to_world(_path[_path_index], 0.0)
+        flat_to_target = target_position - global_position
+        flat_to_target.y = 0.0
 
-    # Her zaman amansız kovalama: sabit hız (oyuncunun koşusundan az daha yavaş).
-    var desired: Vector3 = flat_to_target.normalized() * chase_speed
+    # Amansız kovalama: sabit hız. Suda (havuz) bir miktar yavaşlar ("arkandan yüzer").
+    var spd: float = chase_speed
+    if level_builder.has_method("is_in_water") and level_builder.is_in_water(global_position):
+        spd = chase_speed * 0.62
+    var desired: Vector3 = flat_to_target.normalized() * spd
     velocity.x = move_toward(velocity.x, desired.x, 12.0 * delta)
     velocity.z = move_toward(velocity.z, desired.z, 12.0 * delta)
     velocity.y = -0.2
     move_and_slide()
     _current_speed = Vector2(velocity.x, velocity.z).length()
-    # Yön (gövde döndürmüyoruz; model _update_visual'da oyuncuya bakar).
+    # Yön: model _update_visual'da daima oyuncuya bakar.
 
 func _update_steps(delta: float) -> void:
     if _current_speed < 0.6:

@@ -18,6 +18,7 @@ signal flashlight_clicked(world_position: Vector3)
 
 var mobile_controls
 var hud
+var level_builder
 var lock_controls: bool = false
 var flashlight_energy: float = 1.0
 var stamina: float = 1.0
@@ -359,6 +360,10 @@ func _update_movement(delta: float) -> void:
     else:
         stamina = min(1.0, stamina + stamina_recover_per_second * delta)
 
+    # HAVUZ: suda hareket yavaşlar (karşıya geçerek kaçma — canavar da yavaşlar)
+    if level_builder != null and level_builder.has_method("is_in_water") and level_builder.is_in_water(global_position):
+        target_speed *= 0.55
+
     var desired: Vector3 = (right * input_vector.x + forward * input_vector.y) * target_speed
     velocity.x = move_toward(velocity.x, desired.x, acceleration * delta)
     velocity.z = move_toward(velocity.z, desired.z, acceleration * delta)
@@ -409,6 +414,9 @@ func _update_flashlight(delta: float) -> void:
     # Lens parıltısı (fener kapalıyken sönük)
     if _lens_material != null:
         _lens_material.emission_energy_multiplier = move_toward(_lens_material.emission_energy_multiplier, lens_glow, delta * 30.0)
+    # Buton etiketi: kapalıyken "AÇ", açıkken "KAPA"
+    if mobile_controls != null:
+        mobile_controls.set_flashlight_on(_flashlight_enabled)
 
 func _update_camera_motion(delta: float) -> void:
     var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()

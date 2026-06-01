@@ -65,8 +65,10 @@ func _process(delta: float) -> void:
         post_process.set_vision_radius(vision)
 
     if hud != null and level_builder != null:
-        var distance_to_exit: float = player.global_position.distance_to(level_builder.exit_world_position)
-        hud.set_distance_to_exit(distance_to_exit)
+        # Döngü harita: çıkış yok. HUD bulunduğun katı + uyarıyı gösterir.
+        var floor_index: int = level_builder.world_to_grid(player.global_position).y
+        var floor_name: String = ["ÜST KAT", "ORTA KAT", "ALT KAT (HAVUZ)"][clamp(floor_index, 0, 2)]
+        hud.set_status("%s — çıkış yok, hayatta kal" % floor_name)
         hud.set_stamina(player.stamina)
         hud.set_flashlight_energy(player.flashlight_energy)
         hud.set_noise_level(player.get_noise_level())
@@ -146,9 +148,9 @@ func _create_level() -> void:
     level_builder.world_seed = world_seed
     level_builder.grid_width = maze_width
     level_builder.grid_height = maze_height
-    level_builder.room_count = 16
+    level_builder.room_count = 12
     level_builder.detail_density = 1.0
-    level_builder.floors = 2
+    level_builder.floors = 3            # üst kat / orta kat (başlangıç) / alt kat (havuz)
     add_child(level_builder)
     level_builder.generate()
 
@@ -156,6 +158,7 @@ func _create_player() -> void:
     player = PLAYER_SCRIPT.new()
     player.name = "Player"
     add_child(player)
+    player.level_builder = level_builder
     player.global_position = level_builder.start_world_position + Vector3(0.0, 1.05, 0.0)
 
 func _create_chunk_streamer() -> void:

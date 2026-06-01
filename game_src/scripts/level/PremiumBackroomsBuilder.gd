@@ -39,6 +39,13 @@ var _links: Dictionary = {}           # Vector3i -> Array[Vector3i]  (rampa graf
 var _ramps: Array = []                # geometri için: {"floor","x","z","dir":Vector2i}
 var _open_cells: Array[Vector3i] = []
 
+# Havuz (Poolrooms) — alt katta dev su alanı
+var _water_cells: Dictionary = {}
+var has_pool: bool = false
+var pool_min: Vector3 = Vector3.ZERO
+var pool_max: Vector3 = Vector3.ZERO
+var pool_water_y: float = 0.0
+
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _box_mesh_shared: BoxMesh
 var _cylinder_mesh_shared: CylinderMesh
@@ -66,10 +73,11 @@ func generate() -> void:
     for f: int in range(floors):
         _generate_floor(f)
     _connect_floors()
+    _build_pool()
     _pick_special_cells()
     _collect_open_cells()
     _build_geometry()
-    _build_exit_area()
+    # Çıkış yok (döngü harita) → _build_exit_area çağrılmaz. exit_area null kalır.
 
 # ---------------------------------------------------------------- grid temel
 
@@ -411,10 +419,44 @@ func _bfs_distances(origin: Vector3i) -> Dictionary:
                 frontier.append(n)
     return distances
 
+func _build_pool() -> void:
+    # Alt katta DEV havuz: karşıya geçerek kaçabilirsin, canavar arkandan yüzer (yavaşlar).
+    if floors < 2:
+        return
+    var pf: int = floors - 1
+    var pw: int = clamp(grid_width - 8, 8, 14)
+    var ph: int = clamp(grid_height - 8, 7, 12)
+    var px: int = clamp(int(grid_width / 2 - pw / 2), 1, grid_width - pw - 1)
+    var pz: int = clamp(int(grid_height / 2 - ph / 2), 1, grid_height - ph - 1)
+    for z: int in range(pz, pz + ph):
+        for x: int in range(px, px + pw):
+            _set_cell(pf, x, z, 0)
+            _water_cells["%d:%d:%d" % [pf, x, z]] = true
+    # Havuzu kat ağına bağla (kenarlardan koridor)
+    _rooms.append({"floor": pf, "rect": Rect2i(px, pz, pw, ph)})
+    _connect_to_nearest_room(pf, Vector2i(px - 1, pz + int(ph / 2)))
+    _connect_to_nearest_room(pf, Vector2i(px + pw, pz + int(ph / 2)))
+    var w0: Vector3 = grid_to_world(Vector3i(px, pf, pz), 0.0)
+    var w1: Vector3 = grid_to_world(Vector3i(px + pw - 1, pf, pz + ph - 1), 0.0)
+    var half: float = cell_size * 0.5
+    pool_min = Vector3(min(w0.x, w1.x) - half, w0.y - 1.0, min(w0.z, w1.z) - half)
+    pool_max = Vector3(max(w0.x, w1.x) + half, w0.y + 1.6, max(w0.z, w1.z) + half)
+    pool_water_y = w0.y + 0.25
+    has_pool = true
+
+func is_in_water(pos: Vector3) -> bool:
+    if not has_pool:
+        return false
+    return pos.x >= pool_min.x and pos.x <= pool_max.x \
+        and pos.z >= pool_min.z and pos.z <= pool_max.z \
+        and pos.y >= pool_min.y and pos.y <= pool_max.y
+
 func _pick_special_cells() -> void:
-    # Başlangıç: 0. kattaki ilk oda. Çıkış: en alt kattaki, başlangıçtan en uzak hücre.
-    var start_room: Rect2i = _first_room_on(0)
-    start_cell = Vector3i(_room_center(start_room).x, 0, _room_center(start_room).y)
+    # Başlangıç ORTA kat (üst + alt kat olsun). "Çıkış" yok ama enemy yerleşimi için
+    # en uzak hücre yine hesaplanır.
+    var mid_floor: int = int(floors / 2)
+    var start_room: Rect2i = _first_room_on(mid_floor)
+    start_cell = Vector3i(_room_center(start_room).x, mid_floor, _room_center(start_room).y)
     if not is_open_cell(start_cell):
         start_cell = _nearest_open_cell(start_cell)
 
@@ -521,6 +563,28 @@ func _build_geometry() -> void:
     for key2: Vector3i in buckets.keys():
         _build_chunk(key2, buckets[key2])
 
+    _build_water_surface()
+
+func _build_water_surface() -> void:
+    if not has_pool:
+        return
+    var water: MeshInstance3D = MeshInstance3D.new()
+    water.name = "PoolWater"
+    var pm: PlaneMesh = PlaneMesh.new()
+    pm.size = Vector2(pool_max.x - pool_min.x, pool_max.z - pool_min.z)
+    water.mesh = pm
+    water.position = Vector3((pool_min.x + pool_max.x) * 0.5, pool_water_y, (pool_min.z + pool_max.z) * 0.5)
+    var m: StandardMaterial3D = StandardMaterial3D.new()
+    m.albedo_color = Color(0.05, 0.17, 0.22, 0.6)
+    m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    m.roughness = 0.06
+    m.metallic = 0.25
+    m.emission_enabled = true
+    m.emission = Color(0.02, 0.09, 0.11, 1.0)
+    m.emission_energy_multiplier = 0.5
+    water.material_override = m
+    add_child(water)
+
 func _append_trims(f: int, cell: Vector3i, center: Vector3, bucket: Dictionary) -> void:
     var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
     for d: Vector2i in dirs:
@@ -547,7 +611,7 @@ func _place_columns(buckets: Dictionary) -> void:
             while x <= rect.position.x + rect.size.x - 3:
                 var cell: Vector3i = Vector3i(x, f, z)
                 # açık hücre + lamba değil + başlangıç/çıkış değil
-                if _get_cell(f, x, z) == 0 and not _should_fixture(cell) and cell != start_cell and cell != exit_cell:
+                if _get_cell(f, x, z) == 0 and not _should_fixture(cell) and cell != start_cell and cell != exit_cell and not _water_cells.has("%d:%d:%d" % [f, x, z]):
                     var c: Vector3 = Vector3((float(x) - float(grid_width - 1) * 0.5) * cell_size, base_y, (float(z) - float(grid_height - 1) * 0.5) * cell_size)
                     var bucket: Dictionary = _get_bucket(buckets, f, x, z)
                     _bpush(bucket, "column", _scaled_transform(Vector3(0.55, wall_height, 0.55), c + Vector3(0.0, wall_height * 0.5, 0.0)))

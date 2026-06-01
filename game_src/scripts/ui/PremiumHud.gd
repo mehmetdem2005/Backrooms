@@ -47,6 +47,10 @@ func set_distance_to_exit(distance: float) -> void:
     if _distance_label != null:
         _distance_label.text = "Çıkış sinyali: %04dm" % int(distance)
 
+func set_status(text: String) -> void:
+    if _distance_label != null:
+        _distance_label.text = text
+
 func set_flashlight_energy(value: float) -> void:
     if _flashlight_bar != null:
         _flashlight_bar.value = clamp(value * 100.0, 0.0, 100.0)
@@ -108,10 +112,13 @@ func _build_ui() -> void:
     _subtitle_label = Label.new()
     _subtitle_label.name = "SubtitleHint"
     _subtitle_label.text = _hints[0]
-    _subtitle_label.position = Vector2(600.0, 972.0)
-    _subtitle_label.size = Vector2(900.0, 40.0)
+    _subtitle_label.position = Vector2(360.0, 936.0)
+    _subtitle_label.size = Vector2(1200.0, 60.0)
     _subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _subtitle_label.modulate = Color(1.0, 0.86, 0.54, 0.55)
+    _subtitle_label.add_theme_font_size_override("font_size", 34)
+    _subtitle_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+    _subtitle_label.add_theme_constant_override("outline_size", 6)
+    _subtitle_label.modulate = Color(1.0, 0.88, 0.55, 0.92)
     root.add_child(_subtitle_label)
 
     _message_panel = Panel.new()
