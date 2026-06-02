@@ -11,7 +11,7 @@ extends EditorPlugin
 ## • HIZLI KURMA: sürükle = seri, R = 90° döndür, [ ] = yükseklik, snap aç/kapa.
 ## • HARİTA YÖNETİMİ: grup (oda/kat) altına toplama, grubu/tümünü temizle, sayaç, undo.
 
-const HATA_AYIKLA := true   # teşhis çıktıları (Output panelinde [YP] satırları)
+const HATA_AYIKLA := false   # teşhis çıktıları (gerekirse true yap → Output'ta [YP] satırları)
 const IZGARA: float = 4.0
 const PARCA_KLASORU := "res://parts/"
 const GRUP_META := "parca_grubu"
@@ -277,7 +277,7 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	if _panel.snap_acik:
 		for c in _tum_parcalar(kok):
 			if c.name.begins_with(tip_ad):
-				var fark: Vector3 = c.global_position - hedef
+				var fark: Vector3 = c.position - hedef
 				if absf(fark.x) < C * 0.45 and absf(fark.z) < C * 0.45 and absf(fark.y - yuk) < 0.5:
 					_son_hucre = hedef
 					return
@@ -317,6 +317,7 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	_son_hucre = hedef
 	_son_secilen = ad
 	_sayaci_guncelle()
+	_panel.durum_yaz("✓ %s @ (%.1f, %.1f, %.1f)" % [tip_ad, hedef.x, hedef.y, hedef.z])
 	if HATA_AYIKLA: print("[YP] YERLEŞTİ ✓ '%s' @ %s  (grup='%s', toplam=%d)" % [
 		tip_ad, str(hedef), grup.name, _tum_parcalar(kok).size()])
 
