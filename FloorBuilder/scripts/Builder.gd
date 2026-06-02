@@ -61,6 +61,9 @@ func _setup_material() -> void:
 	floor_mat.roughness_texture = load("res://textures/floor_rough.png")
 	floor_mat.ao_enabled = true
 	floor_mat.ao_texture = load("res://textures/floor_ao.png")
+	floor_mat.normal_enabled = true
+	floor_mat.normal_texture = load("res://textures/floor_normal.png")
+	floor_mat.normal_scale = 1.0
 	floor_mat.roughness = 1.0
 	tile_mesh = BoxMesh.new()
 	tile_mesh.size = Vector3(G, 0.12, G)
