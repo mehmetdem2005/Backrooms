@@ -21,8 +21,8 @@ var rastgele_donme: bool = true
 var yuzeye_sigdir: bool = true                  # leke yüzey kenarından taşmasın
 var yuzey_filtre: String = "hepsi"             # hepsi|zemin|duvar|tavan
 var renk: Color = Color(1, 1, 1)               # tint (dokuyu çarpar)
-var esik: float = 0.05
-var yumusaklik: float = 0.10
+var esik: float = 0.22
+var yumusaklik: float = 0.12
 var islak: bool = false
 var kendinden_isikli: bool = false
 var ofset: float = 0.012                       # yüzeyden uzaklık (z-fighting önler)
@@ -178,7 +178,7 @@ func _arayuz_olustur() -> void:
 	_renk_btn.color_changed.connect(func(c): renk = c)
 	renk_sat.add_child(_renk_btn)
 
-	_kaydirici("Kenar Eşiği", 0.0, 0.6, 0.01, esik, func(v): _esik_ayarla(v))
+	_kaydirici("Kenar Eşiği (koyu zemini kes)", 0.0, 0.5, 0.01, esik, func(v): _esik_ayarla(v))
 	_kaydirici("Kenar Yumuşaklığı", 0.01, 0.6, 0.01, yumusaklik, func(v): _yumusaklik_ayarla(v))
 
 	# --- Yüzey filtresi ---

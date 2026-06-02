@@ -196,7 +196,10 @@ func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, t
 	var mi := MeshInstance3D.new()
 	mi.name = "Leke"
 	var q := QuadMesh.new()
-	var s := randf_range(_panel.boyut_min, _panel.boyut_max)
+	# min/max ters girilse bile geçerli aralık (negatif/sıfır boyut olmasın)
+	var bmin := maxf(minf(_panel.boyut_min, _panel.boyut_max), 0.05)
+	var bmax := maxf(_panel.boyut_min, _panel.boyut_max)
+	var s := randf_range(bmin, bmax)
 	# Yüzeyden taşmasın: kare köşeleri de sığsın diye yarı-köşegen (s*0.5*√2)
 	# azami sınırı geçmemeli -> s <= azami_yari * 2 / √2.
 	if azami_yari < INF:
@@ -208,7 +211,9 @@ func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, t
 	var mat := StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_texture = _kutuphane.alfa_doku(yol, _panel.esik, _panel.yumusaklik)
-	var op := randf_range(_panel.opaklik_min, _panel.opaklik_max)
+	var omin := clampf(minf(_panel.opaklik_min, _panel.opaklik_max), 0.0, 1.0)
+	var omax := clampf(maxf(_panel.opaklik_min, _panel.opaklik_max), 0.0, 1.0)
+	var op := maxf(randf_range(omin, omax), 0.08)  # tamamen görünmez olmasın
 	mat.albedo_color = Color(_panel.renk.r, _panel.renk.g, _panel.renk.b, op)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
