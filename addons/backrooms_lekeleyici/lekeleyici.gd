@@ -1,0 +1,242 @@
+@tool
+extends EditorPlugin
+## BACKROOMS LEKELEYİCİ
+## Yerleştirici ile koyduğun duvar/zemin/tavan parçalarını boyar, lekeler, çamurlar.
+## Yüzeye hizalı şeffaf "sticker" mesh basar (QuadMesh) — Decal kullanmaz, bu yüzden
+## Mobile renderer dahil her render motorunda çalışır.
+
+const KAPSAYICI_AD := "Lekeler"
+
+var _kutuphane: LekeKutuphane
+var _panel: LekePanel
+var _dock: ScrollContainer
+
+# 3B viewport sürükleme durumu
+var _basili := false
+var _son_pos := Vector3.ZERO
+var _gecerli_pos := false
+
+func _enter_tree() -> void:
+	_kutuphane = LekeKutuphane.new()
+	_panel = LekePanel.new()
+	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_panel.kur(_kutuphane)
+	_panel.onbellek_temizle_istendi.connect(_kutuphane.onbellegi_temizle)
+	# Uzun içerik için kaydırılabilir kapsayıcıya sar.
+	_dock = ScrollContainer.new()
+	_dock.name = "Lekeleyici"
+	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_dock.add_child(_panel)
+	add_control_to_dock(EditorPlugin.DOCK_SLOT_RIGHT_BL, _dock)
+
+func _exit_tree() -> void:
+	if _dock:
+		remove_control_from_docks(_dock)
+		_dock.queue_free()
+		_dock = null
+	_panel = null
+	_kutuphane = null
+
+func _handles(_o: Object) -> bool:
+	return _panel != null and _panel.mod != "yok"
+
+func _forward_3d_gui_input(kamera: Camera3D, olay: InputEvent) -> int:
+	if _panel == null or _panel.mod == "yok":
+		return EditorPlugin.AFTER_GUI_INPUT_PASS
+
+	# Basma / bırakma
+	if olay is InputEventMouseButton:
+		if olay.button_index == MOUSE_BUTTON_LEFT:
+			if olay.pressed:
+				_basili = true
+				_gecerli_pos = false
+				_islem(kamera, olay.position)
+				return EditorPlugin.AFTER_GUI_INPUT_STOP
+			else:
+				_basili = false
+				return EditorPlugin.AFTER_GUI_INPUT_STOP
+	elif olay is InputEventScreenTouch:
+		if olay.pressed:
+			_basili = true
+			_gecerli_pos = false
+			_islem(kamera, olay.position)
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
+		else:
+			_basili = false
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
+
+	# Sürükleme (sadece boya modunda, basılıyken)
+	if _basili and _panel.mod == "boya":
+		var poz := Vector2.ZERO
+		var var_mi := false
+		if olay is InputEventMouseMotion and (olay.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+			poz = olay.position; var_mi = true
+		elif olay is InputEventScreenDrag:
+			poz = olay.position; var_mi = true
+		if var_mi:
+			_surukle(kamera, poz)
+			return EditorPlugin.AFTER_GUI_INPUT_STOP
+
+	return EditorPlugin.AFTER_GUI_INPUT_PASS
+
+func _islem(kamera: Camera3D, ekran: Vector2) -> void:
+	if _panel.mod == "boya":
+		_boya(kamera, ekran)
+	elif _panel.mod == "sil":
+		_sil(kamera, ekran)
+
+func _surukle(kamera: Camera3D, ekran: Vector2) -> void:
+	var kok := EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	var v := LekeIsin.sahne_isin(kok, kamera, ekran)
+	if not v.carpti:
+		return
+	if _gecerli_pos and v.nokta.distance_to(_son_pos) < _panel.aralik:
+		return
+	if not _yuzey_uygun(v.normal):
+		return
+	_leke_bas(kok, v.nokta, v.normal)
+	_son_pos = v.nokta
+	_gecerli_pos = true
+
+func _boya(kamera: Camera3D, ekran: Vector2) -> void:
+	var kok := EditorInterface.get_edited_scene_root()
+	if kok == null:
+		_panel._durum.text = "Önce sahneyi aç (Harita.tscn)"
+		return
+	var v := LekeIsin.sahne_isin(kok, kamera, ekran)
+	if not v.carpti:
+		return
+	if not _yuzey_uygun(v.normal):
+		_panel._durum.text = "Bu yüzey filtreye uymuyor (Yüzey: %s)" % _panel.yuzey_filtre
+		return
+	_leke_bas(kok, v.nokta, v.normal)
+	_son_pos = v.nokta
+	_gecerli_pos = true
+
+## Tek tıkta saçılma adedince leke üretir, hepsini tek undo işleminde ekler.
+func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3) -> void:
+	var kapsayici := _kapsayici_bul_olustur(kok)
+	var n := normal.normalized()
+	# Teğet düzlem (saçılma ofseti için)
+	var yardim := Vector3.UP if absf(n.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
+	var teg_x := yardim.cross(n).normalized()
+	var teg_y := n.cross(teg_x).normalized()
+
+	var stickerlar: Array[MeshInstance3D] = []
+	var adet := maxi(_panel.saci_sayi, 1)
+	for i in adet:
+		var merkez := nokta
+		if i > 0 and _panel.saci_yaricap > 0.0:
+			var ac := randf() * TAU
+			var r := sqrt(randf()) * _panel.saci_yaricap
+			merkez = nokta + teg_x * (cos(ac) * r) + teg_y * (sin(ac) * r)
+		var yol := _panel.rastgele_yol()
+		if yol == "":
+			continue
+		var s := _sticker_olustur(yol, merkez, n, teg_x, teg_y, i)
+		if s != null:
+			stickerlar.append(s)
+	if stickerlar.is_empty():
+		return
+
+	var ur := get_undo_redo()
+	ur.create_action("Leke bas (%d)" % stickerlar.size(), UndoRedo.MERGE_DISABLE, kok)
+	for s in stickerlar:
+		ur.add_do_method(kapsayici, "add_child", s, true)
+		ur.add_do_method(s, "set_owner", kok)
+		ur.add_do_reference(s)
+		ur.add_undo_method(kapsayici, "remove_child", s)
+	ur.commit_action()
+	_panel._durum.text = "Leke basıldı (%d). Yüzey: %s" % [stickerlar.size(), _panel.yuzey_filtre]
+
+func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, teg_y: Vector3, indeks: int) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "Leke"
+	var q := QuadMesh.new()
+	var s := randf_range(_panel.boyut_min, _panel.boyut_max)
+	q.size = Vector2(s, s)
+	mi.mesh = q
+
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_texture = _kutuphane.alfa_doku(yol, _panel.esik, _panel.yumusaklik)
+	var op := randf_range(_panel.opaklik_min, _panel.opaklik_max)
+	mat.albedo_color = Color(_panel.renk.r, _panel.renk.g, _panel.renk.b, op)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	if _panel.kendinden_isikli:
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if _panel.islak:
+		mat.metallic = 0.55
+		mat.roughness = 0.12
+	else:
+		mat.roughness = 0.95
+	# Üst üste binen lekeler için çizim önceliği (yeni leke üstte).
+	mat.render_priority = clampi(1 + indeks, 1, 100)
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	# Yönelim: QuadMesh +Z'yi yüzey normaline hizala
+	var b := Basis(teg_x, teg_y, n)
+	if _panel.rastgele_donme:
+		b = b.rotated(n, randf() * TAU)
+	# Hafif rastgele ofset farkı z-fighting/sorting'i azaltır
+	var ek := _panel.ofset + indeks * 0.0015 + randf() * 0.001
+	mi.transform = Transform3D(b, nokta + n * ek)
+	mi.set_meta("leke", true)
+	return mi
+
+func _yuzey_uygun(normal: Vector3) -> bool:
+	var ny := normal.normalized().y
+	match _panel.yuzey_filtre:
+		"zemin": return ny > 0.6
+		"tavan": return ny < -0.6
+		"duvar": return absf(ny) <= 0.6
+		_: return true
+
+func _kapsayici_bul_olustur(kok: Node) -> Node3D:
+	for c in kok.get_children():
+		if c is Node3D and c.has_meta("leke_kapsayici"):
+			return c
+	var kap := Node3D.new()
+	kap.name = KAPSAYICI_AD
+	kap.set_meta("leke_kapsayici", true)
+	kok.add_child(kap)
+	kap.owner = kok
+	kap.transform = Transform3D.IDENTITY
+	return kap
+
+func _sil(kamera: Camera3D, ekran: Vector2) -> void:
+	var kok := EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	var lekeler: Array[Node] = []
+	_lekeleri_topla(kok, lekeler)
+	var en_yakin: Node3D = null
+	var en_kucuk := 64.0  # px eşiği (dokunmatik dostu)
+	for l in lekeler:
+		var sp := kamera.unproject_position((l as Node3D).global_position)
+		var d := sp.distance_to(ekran)
+		if d < en_kucuk:
+			en_kucuk = d
+			en_yakin = l
+	if en_yakin == null:
+		return
+	var ebeveyn := en_yakin.get_parent()
+	var ur := get_undo_redo()
+	ur.create_action("Leke sil", UndoRedo.MERGE_DISABLE, kok)
+	ur.add_do_method(ebeveyn, "remove_child", en_yakin)
+	ur.add_undo_method(ebeveyn, "add_child", en_yakin, true)
+	ur.add_undo_method(en_yakin, "set_owner", kok)
+	ur.add_undo_reference(en_yakin)
+	ur.commit_action()
+	_panel._durum.text = "Leke silindi"
+
+func _lekeleri_topla(n: Node, dizi: Array[Node]) -> void:
+	if n.has_meta("leke"):
+		dizi.append(n)
+	for c in n.get_children():
+		_lekeleri_topla(c, dizi)
