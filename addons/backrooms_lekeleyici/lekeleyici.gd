@@ -153,6 +153,8 @@ func _boya(kamera: Camera3D, ekran: Vector2) -> void:
 func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 	var kapsayici := _kapsayici_bul_olustur(kok)
 	var n := normal.normalized()
+	if n.length() < 0.5:
+		n = Vector3.UP  # bozuk/sıfır normal koruması (axis-normalized hatasını önler)
 	# Teğet düzlem (saçılma ofseti için)
 	var yardim := Vector3.UP if absf(n.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
 	var teg_x := yardim.cross(n).normalized()

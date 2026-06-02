@@ -84,7 +84,9 @@ static func _mesh_ucgen_isin(mesh: Mesh, o: Vector3, d: Vector3) -> Vector4:
 	var en := INF
 	var sonuc := Vector4(-1.0, 0.0, 1.0, 0.0)
 	for s in mesh.get_surface_count():
-		if mesh.surface_get_primitive_type(s) != Mesh.PRIMITIVE_TRIANGLES:
+		# NOT: surface_get_primitive_type yalnızca ArrayMesh'te var. BoxMesh gibi
+		# PrimitiveMesh'ler her zaman üçgendir, o yüzden sadece ArrayMesh'te kontrol et.
+		if mesh is ArrayMesh and (mesh as ArrayMesh).surface_get_primitive_type(s) != Mesh.PRIMITIVE_TRIANGLES:
 			continue
 		var arr := mesh.surface_get_arrays(s)
 		if arr.is_empty():
