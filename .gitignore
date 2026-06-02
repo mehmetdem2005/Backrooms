@@ -81,4 +81,3 @@ blender-4.2.6-linux-x64/
 /blender
 *.log
 white_render*.png
-PYEOF_*
