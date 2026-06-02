@@ -161,22 +161,39 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	var carpma = _zemin_noktasi(kamera, ekran)
 	if carpma == null:
 		return
-	# Inspector ayarları: ızgara, yükseklik, ölçek, döndürme
-	# ÖNEMLİ: Izgara, parçanın ölçeğiyle (olcek) birlikte büyür. Böylece parçayı
-	# scale ile büyütünce ızgara da büyür ve parçalar üst üste binmeden kenar kenara
-	# dizilir. (Eski hâlinde ızgara sabit 4 m kalıp ölçeklenen parçalar çakışıyordu.)
+	# --- SİSTEMATİK IZGARA HİZALAMA ---
+	# C = efektif hücre boyutu (parça ölçeğiyle birlikte büyür, böylece scale
+	#     değişince parçalar üst üste binmeden kenar kenara dizilir).
+	# Zemin/tavan (eksen "y") -> hücre MERKEZİNE oturur.
+	# Duvar (ince panel)      -> ince ekseninde ızgara ÇİZGİSİNE (karo kenarına),
+	#                            uzun ekseninde hücre MERKEZİNE oturur. Böylece
+	#                            duvar karonun ortasında değil, kenarında durur.
+	#                            Uzun/ince eksen, duvarın dönüşüne (donme_y) göre
+	#                            otomatik belirlenir (0/180 = X boyunca, 90/270 = Z boyunca).
 	var taban: float = secili_ayar.izgara if secili_ayar != null and secili_ayar.izgara > 0.001 else IZGARA
 	var olc: float = secili_ayar.olcek if secili_ayar != null and secili_ayar.olcek > 0.001 else 1.0
-	var g: float = taban * olc
+	var C: float = taban * olc
 	var yuk: float = secili_ayar.yukseklik if secili_ayar != null else 0.0
-	var hedef: Vector3 = Vector3(floorf(carpma.x / g) * g + g * 0.5, yuk, floorf(carpma.z / g) * g + g * 0.5)
-	# Aynı hücrede aynı türden parça varsa üst üste bindirme (kopya engelle).
+	var eksen: String = parcalar[secili_ad].get("eksen", "y")
+	var hedef: Vector3
+	if eksen == "y":
+		hedef = Vector3(floorf(carpma.x / C) * C + C * 0.5, yuk, floorf(carpma.z / C) * C + C * 0.5)
+	else:
+		var donme: float = secili_ayar.donme_y if secili_ayar != null else 0.0
+		var d: float = fmod(absf(donme), 180.0)
+		if d > 45.0 and d < 135.0:
+			# Duvar Z ekseni boyunca uzanır (ince eksen X): X = ızgara çizgisi, Z = merkez
+			hedef = Vector3(roundf(carpma.x / C) * C, yuk, floorf(carpma.z / C) * C + C * 0.5)
+		else:
+			# Duvar X ekseni boyunca uzanır (ince eksen Z): X = merkez, Z = ızgara çizgisi
+			hedef = Vector3(floorf(carpma.x / C) * C + C * 0.5, yuk, roundf(carpma.z / C) * C)
+	# Aynı konumda aynı türden parça varsa üst üste bindirme (kopya/çakışma engelle).
 	var tip_ad: String = secili_ad.replace(" ", "")
 	for c in kok.get_children():
 		if c is Node3D and c.has_meta("yp") and (c as Node3D).name.begins_with(tip_ad):
 			var fark: Vector3 = (c as Node3D).position - hedef
-			if absf(fark.x) < g * 0.45 and absf(fark.z) < g * 0.45 and absf(fark.y - yuk) < 0.5:
-				durum.text = "  Bu hücre zaten dolu (üst üste binme engellendi)"
+			if absf(fark.x) < C * 0.45 and absf(fark.z) < C * 0.45 and absf(fark.y - yuk) < 0.5:
+				durum.text = "  Bu konum zaten dolu (üst üste binme engellendi)"
 				return
 	var sahne: PackedScene = load(secili_yol) as PackedScene
 	if sahne == null:
