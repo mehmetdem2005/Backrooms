@@ -56,6 +56,8 @@ var _ceiling_material: Material
 var _trim_material: Material
 var _metal_material: Material
 var _concrete_material: Material
+var _tile_material: Material
+var _grate_material: Material
 var _ceiling_grid_material: Material
 var _emissive_material: Material
 var _exit_material: Material
@@ -534,8 +536,11 @@ func _build_geometry() -> void:
                 var bucket: Dictionary = _get_bucket(buckets, f, x, z)
                 var key: String = "%d:%d:%d" % [f, x, z]
                 if _get_cell(f, x, z) == 0:
+                    var is_water: bool = _water_cells.has(key)
                     if not holes.has(key):
-                        _bpush(bucket, "floor", _scaled_transform(Vector3(cell_size, 0.10, cell_size), center + Vector3(0.0, -0.05, 0.0)))
+                        # Havuz hücreleri beyaz fayans, diğerleri halı
+                        var floor_type: String = "pooltile" if is_water else "floor"
+                        _bpush(bucket, floor_type, _scaled_transform(Vector3(cell_size, 0.10, cell_size), center + Vector3(0.0, -0.05, 0.0)))
                     # Tavan (sadece üstünde başka kat yoksa tam tavan; rampa deliği hariç)
                     if not holes.has(key):
                         _bpush(bucket, "ceiling", _scaled_transform(Vector3(cell_size, 0.12, cell_size), center + Vector3(0.0, ceiling_height, 0.0)))
@@ -551,6 +556,9 @@ func _build_geometry() -> void:
                         _bpush(bucket, "housing", _scaled_transform(Vector3(cell_size * 0.72, 0.13, 0.60), fp + Vector3(0.0, 0.05, 0.0)))
                         _bpush(bucket, "fixture", _scaled_transform(Vector3(cell_size * 0.58, 0.05, 0.12), fp + Vector3(0.0, 0.0, -0.13)))
                         _bpush(bucket, "fixture", _scaled_transform(Vector3(cell_size * 0.58, 0.05, 0.12), fp + Vector3(0.0, 0.0, 0.13)))
+                    # Tavan havalandırma ızgarası (paslı metal grate)
+                    if not is_water and _should_vent(cell):
+                        _bpush(bucket, "vent", _scaled_transform(Vector3(cell_size * 0.5, 0.04, cell_size * 0.3), center + Vector3(0.0, ceiling_height - 0.10, 0.0)))
                 else:
                     _bpush(bucket, "wall", _scaled_transform(Vector3(cell_size, wall_height, cell_size), center + Vector3(0.0, wall_height * 0.5, 0.0)))
                     if not bucket.has("_walls"):
@@ -680,6 +688,8 @@ func _chunk_type_info(type_name: String) -> Array:
         "grid": return [false, _ceiling_grid_material]
         "trim": return [false, _trim_material]
         "column": return [false, _concrete_material]
+        "pooltile": return [false, _tile_material]
+        "vent": return [false, _grate_material]
         "housing": return [false, _metal_material]
         "fixture": return [false, _emissive_material]
         "ramp": return [false, _ramp_material]
@@ -787,6 +797,10 @@ func _should_fixture(cell: Vector3i) -> bool:
     var h: int = abs(cell.x * 73856093 ^ cell.z * 19349663 ^ (world_seed + cell.y * 7))
     return h % 4 == 0
 
+func _should_vent(cell: Vector3i) -> bool:
+    var h: int = abs(cell.x * 19349663 ^ cell.z * 83492791 ^ (world_seed + cell.y * 11))
+    return h % 13 == 0
+
 func _box_mesh() -> BoxMesh:
     if _box_mesh_shared == null:
         _box_mesh_shared = BoxMesh.new()
@@ -850,6 +864,9 @@ func _create_materials() -> void:
     _ceiling_material = _make_pbr("ceiling", Color(1.0, 0.98, 0.92, 1.0), 0.0, 0.85, Vector3(2.0, 2.0, 1.0), true)
     _metal_material = _make_pbr("metal", Color(0.86, 0.87, 0.90, 1.0), 0.85, 0.5, Vector3(1.0, 1.0, 1.0), true, true)
     _concrete_material = _make_pbr("concrete", Color(0.93, 0.91, 0.86, 1.0), 0.0, 0.82, Vector3(1.0, 1.0, 1.0), true, true)
+    # Havuz zemini: beyaz fayans (PolyHaven). Vent/ızgara: paslı metal grate (PolyHaven).
+    _tile_material = _make_pbr("tile", Color(0.96, 0.97, 0.98, 1.0), 0.0, 0.4, Vector3(2.0, 2.0, 1.0), true, true)
+    _grate_material = _make_pbr("grate", Color(0.7, 0.68, 0.64, 1.0), 0.6, 0.7, Vector3(1.0, 1.0, 1.0), true, true)
 
     _trim_material = _make_flat(Color(0.40, 0.33, 0.18, 1.0), 0.7)
     _ramp_material = _make_pbr("concrete", Color(0.88, 0.86, 0.81, 1.0), 0.0, 0.85, Vector3(1.0, 1.0, 1.0), false)
