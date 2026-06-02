@@ -168,36 +168,46 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	if sahne == null:
 		return
 	var ornek: Node3D = sahne.instantiate()
-	ornek.name = secili_ad
+	ornek.name = secili_ad.replace(" ", "")
 	ornek.position = hedef
 	if secili_ayar != null:
 		ornek.scale = Vector3.ONE * secili_ayar.olcek
 		ornek.rotation = Vector3(0.0, deg_to_rad(secili_ayar.donme_y), 0.0)
+	ornek.set_meta("yp", true)
 	var ur: EditorUndoRedoManager = get_undo_redo()
-	ur.create_action("Parça yerleştir: " + secili_ad)
-	ur.add_do_method(kok, "add_child", ornek)
+	ur.create_action("Parça yerleştir: " + secili_ad, UndoRedo.MERGE_DISABLE, kok)
+	ur.add_do_method(kok, "add_child", ornek, true)
 	ur.add_do_method(ornek, "set_owner", kok)
 	ur.add_do_reference(ornek)
 	ur.add_undo_method(kok, "remove_child", ornek)
 	ur.commit_action()
 
+func _silinebilir(c: Node) -> bool:
+	if c is Camera3D or c is DirectionalLight3D or c is WorldEnvironment:
+		return false
+	return c is Node3D
+
 func _sil(kamera: Camera3D, ekran: Vector2) -> void:
 	var kok: Node = EditorInterface.get_edited_scene_root()
 	if kok == null:
 		return
-	var carpma = _zemin_noktasi(kamera, ekran)
-	if carpma == null:
-		return
-	var hedef_hucre: Vector2 = Vector2(floorf(carpma.x / IZGARA), floorf(carpma.z / IZGARA))
+	# Tıklanan noktaya EKRANDA en yakın parçayı bul (ızgaradan bağımsız, güvenilir)
+	var en_yakin: Node3D = null
+	var en_kucuk: float = 160.0   # px eşiği
 	for c: Node in kok.get_children():
-		if c is Node3D:
-			var ch: Vector2 = Vector2(floorf(c.position.x / IZGARA), floorf(c.position.z / IZGARA))
-			if ch == hedef_hucre:
-				var ur: EditorUndoRedoManager = get_undo_redo()
-				ur.create_action("Parça sil")
-				ur.add_do_method(kok, "remove_child", c)
-				ur.add_undo_method(kok, "add_child", c)
-				ur.add_undo_method(c, "set_owner", kok)
-				ur.add_undo_reference(c)
-				ur.commit_action()
-				return
+		if not _silinebilir(c):
+			continue
+		var sp: Vector2 = kamera.unproject_position(c.global_position)
+		var d: float = sp.distance_to(ekran)
+		if d < en_kucuk:
+			en_kucuk = d
+			en_yakin = c
+	if en_yakin == null:
+		return
+	var ur: EditorUndoRedoManager = get_undo_redo()
+	ur.create_action("Parça sil", UndoRedo.MERGE_DISABLE, kok)
+	ur.add_do_method(kok, "remove_child", en_yakin)
+	ur.add_undo_method(kok, "add_child", en_yakin)
+	ur.add_undo_method(en_yakin, "set_owner", kok)
+	ur.add_undo_reference(en_yakin)
+	ur.commit_action()
