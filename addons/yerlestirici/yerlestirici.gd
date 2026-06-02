@@ -20,6 +20,9 @@ const YUK_ADIM := 0.5
 var parcalar: Dictionary = {}     # ad -> {yol, ikon, eksen, kal, yuk}
 var _panel: YerlestirmePanel
 var _dock: ScrollContainer
+var _arac: HBoxContainer
+var _btn_koy: Button
+var _btn_sil: Button
 var _son_secilen: String = ""
 var _basili: bool = false
 var _son_hucre: Vector3 = Vector3(INF, INF, INF)
@@ -27,9 +30,43 @@ var _son_hucre: Vector3 = Vector3(INF, INF, INF)
 func _enter_tree() -> void:
 	_parcalari_tara()
 	_paneli_kur()
+	_arac_kur()
 
 func _exit_tree() -> void:
+	if _arac:
+		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _arac)
+		_arac.queue_free()
+		_arac = null
 	_panel_kaldir()
+
+# Viewport üst barına Koy/Sil/Dur — modu buradan da aç/kapatabilirsin (etkinleştirmeyi garantiler).
+func _arac_kur() -> void:
+	_arac = HBoxContainer.new()
+	_arac.add_theme_constant_override("separation", 4)
+	_btn_koy = Button.new()
+	_btn_koy.text = "🧱 Koy"
+	_btn_koy.toggle_mode = true
+	_btn_koy.tooltip_text = "Yerleştirme modu (parçayı soldaki 'Yerleştirici' panelinden seç)"
+	_btn_koy.toggled.connect(func(a: bool): _mod_tikla("koy" if a else "yok"))
+	_arac.add_child(_btn_koy)
+	_btn_sil = Button.new()
+	_btn_sil.text = "🗑 Sil"
+	_btn_sil.toggle_mode = true
+	_btn_sil.modulate = Color(1.0, 0.78, 0.78)
+	_btn_sil.toggled.connect(func(a: bool): _mod_tikla("sil" if a else "yok"))
+	_arac.add_child(_btn_sil)
+	add_control_to_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _arac)
+
+func _mod_tikla(m: String) -> void:
+	if _panel:
+		_panel.mod_ayarla(m)
+
+func _arac_guncelle(m: String) -> void:
+	if _btn_koy:
+		_btn_koy.set_pressed_no_signal(m == "koy")
+	if _btn_sil:
+		_btn_sil.set_pressed_no_signal(m == "sil")
+
 
 # ---------------------------------------------------------------- Panel / dock
 func _paneli_kur() -> void:
@@ -41,6 +78,7 @@ func _paneli_kur() -> void:
 	_panel.tumunu_temizle_istendi.connect(_tumunu_temizle)
 	_panel.son_parca_istendi.connect(_son_parcayi_sec)
 	_panel.parca_secildi.connect(func(ad): _son_secilen = ad)
+	_panel.mod_degisti.connect(_arac_guncelle)
 	_dock = ScrollContainer.new()
 	_dock.name = "Yerleştirici"
 	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -112,8 +150,11 @@ func _parca_coz(yol: String, gad: String) -> Dictionary:
 	return bilgi
 
 # ---------------------------------------------------------------- 3B giriş
+# Her zaman true: eklenti hep aktif 3B handler olur. Boştayken (_panel.mod == "yok")
+# forward PASS ettiği için normal editör/gizmo davranışı bozulmaz. Bu sayede modu
+# dock/araç çubuğundan açtığında seçim değişmeden de ilk sürükleme çalışır.
 func _handles(_o: Object) -> bool:
-	return _panel != null and _panel.mod != "yok"
+	return _panel != null
 
 func _forward_3d_gui_input(kamera: Camera3D, olay: InputEvent) -> int:
 	if _panel == null or _panel.mod == "yok":
