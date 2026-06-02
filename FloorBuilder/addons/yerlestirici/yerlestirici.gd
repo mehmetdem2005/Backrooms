@@ -10,6 +10,7 @@ const IZGARA: float = 4.0
 var parcalar: Dictionary = {
 	"Zemin": {"yol": "res://parts/Zemin.tscn", "ikon": "res://textures/floor_albedo.png"},
 	"Gri Zemin": {"yol": "res://parts/GriZemin.tscn", "ikon": "res://textures/gray_tile_wall_01_albedo.png"},
+	"Duvar": {"yol": "res://parts/Duvar.tscn", "ikon": "res://textures/gray_tile_wall_clean_albedo.png"},
 }
 
 var arac: HBoxContainer
