@@ -1,0 +1,81 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://textures/floor_albedo.png" id="1_4f6jj"]
+[ext_resource type="Texture2D" path="res://textures/floor_ao.png" id="2_q1s0u"]
+[ext_resource type="Texture2D" path="res://textures/floor_normal.png" id="3_sul2s"]
+[ext_resource type="Texture2D" path="res://textures/floor_rough.png" id="4_cpwyp"]
+
+[sub_resource type="Environment" id="Environment_0brml"]
+background_mode = 1
+background_color = Color(0.1, 0.11, 0.13, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.92, 0.93, 0.95, 1)
+tonemap_mode = 4
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_duf1n"]
+size = Vector2(4, 4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_iq74w"]
+albedo_texture = ExtResource("1_4f6jj")
+roughness_texture = ExtResource("4_cpwyp")
+normal_enabled = true
+normal_texture = ExtResource("3_sul2s")
+ao_enabled = true
+ao_texture = ExtResource("2_q1s0u")
+
+[node name="Harita" type="Node3D" unique_id=1226466879]
+
+[node name="Kamera" type="Camera3D" parent="." unique_id=67910553]
+transform = Transform3D(0.9938837, -0.07311503, 0.08276059, 0, 0.7494289, 0.6620847, -0.11043153, -0.6580352, 0.7448453, 10, 16, 26)
+
+[node name="Isik" type="DirectionalLight3D" parent="." unique_id=1423766400]
+transform = Transform3D(0.81915206, -0.46984634, 0.32898995, 0, 0.57357645, 0.81915206, -0.57357645, -0.6710101, 0.46984634, 0, 0, 0)
+light_energy = 0.8
+
+[node name="Ortam" type="WorldEnvironment" parent="." unique_id=1104806717]
+environment = SubResource("Environment_0brml")
+
+[node name="Zemin" type="MeshInstance3D" parent="." unique_id=1395185039]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@2" type="MeshInstance3D" parent="." unique_id=1329811424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 6)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@3" type="MeshInstance3D" parent="." unique_id=1405961273]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 10)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@4" type="MeshInstance3D" parent="." unique_id=1536637881]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 2)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@5" type="MeshInstance3D" parent="." unique_id=1789575144]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 6)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@6" type="MeshInstance3D" parent="." unique_id=1864891671]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 10)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@7" type="MeshInstance3D" parent="." unique_id=1118753877]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 2)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@8" type="MeshInstance3D" parent="." unique_id=1198493981]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 6)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+
+[node name="@MeshInstance3D@9" type="MeshInstance3D" parent="." unique_id=1103135236]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 10)
+mesh = SubResource("PlaneMesh_duf1n")
+surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")

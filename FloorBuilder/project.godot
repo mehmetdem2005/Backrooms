@@ -1,9 +1,9 @@
-; Backrooms Floor Builder - temiz proje (sadece kullanıcının verdiği zemin)
+; Backrooms - Parça Yerleştirici (sadece kullanıcının zemin dokusu + yerleştirme eklentisi)
 config_version=5
 
 [application]
-config/name="Floor Builder"
-run/main_scene="res://Level.tscn"
+config/name="Parça Yerleştirici"
+run/main_scene="res://Harita.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 
 [display]
@@ -11,6 +11,9 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/handheld/orientation=1
 window/stretch/mode="canvas_items"
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/yerlestirici/plugin.cfg")
 
 [input_devices]
 pointing/emulate_touch_from_mouse=true

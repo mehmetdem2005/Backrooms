@@ -9,35 +9,26 @@ func _init() -> void:
     mat.normal_texture = load("res://textures/floor_normal.png")
     mat.roughness = 1.0
     ResourceSaver.save(mat, "res://floor_material.tres")
-
-    # --- FloorTile.tscn : tek zemin parçası (PlaneMesh 4x4) ---
-    var tile := MeshInstance3D.new()
-    tile.name = "FloorTile"
+    # Parça: "Zemin" (kök düğüm adı Türkçe, "Mesh" yok)
+    var zemin := MeshInstance3D.new()
+    zemin.name = "Zemin"
     var pm := PlaneMesh.new()
     pm.size = Vector2(4, 4)
-    tile.mesh = pm
-    tile.set_surface_override_material(0, mat)
-    var ts := PackedScene.new()
-    ts.pack(tile)
-    ResourceSaver.save(ts, "res://FloorTile.tscn")
-
-    # --- Level.tscn : haritayı dizeceğin sahne (demo 4x4 + kamera + ışık) ---
-    var root := Node3D.new(); root.name = "Level"
-    var holder := Node3D.new(); holder.name = "Floors"
-    root.add_child(holder); holder.owner = root
-    for x in range(4):
-        for z in range(4):
-            var inst := ts.instantiate()
-            inst.position = Vector3(x * 4, 0, z * 4)
-            holder.add_child(inst); inst.owner = root
-    var cam := Camera3D.new(); cam.name = "Camera3D"
-    cam.transform = Transform3D(Basis(), Vector3(6, 17, 28)).looking_at(Vector3(6, 0, 6), Vector3.UP)
+    zemin.mesh = pm
+    zemin.set_surface_override_material(0, mat)
+    var zs := PackedScene.new()
+    zs.pack(zemin)
+    ResourceSaver.save(zs, "res://parts/Zemin.tscn")
+    # Sahne: Harita (kamera + ışık + ortam; boş, sen dizeceksin)
+    var root := Node3D.new(); root.name = "Harita"
+    var cam := Camera3D.new(); cam.name = "Kamera"
+    cam.transform = Transform3D(Basis(), Vector3(10, 16, 26)).looking_at(Vector3(8, 0, 8), Vector3.UP)
     root.add_child(cam); cam.owner = root
-    var sun := DirectionalLight3D.new(); sun.name = "Sun"
+    var sun := DirectionalLight3D.new(); sun.name = "Isik"
     sun.rotation = Vector3(deg_to_rad(-55), deg_to_rad(35), 0)
     sun.light_energy = 0.8
     root.add_child(sun); sun.owner = root
-    var we := WorldEnvironment.new(); we.name = "WorldEnvironment"
+    var we := WorldEnvironment.new(); we.name = "Ortam"
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
     env.background_color = Color(0.10, 0.11, 0.13)
@@ -47,8 +38,13 @@ func _init() -> void:
     env.tonemap_mode = Environment.TONE_MAPPER_AGX
     we.environment = env
     root.add_child(we); we.owner = root
-    var ls := PackedScene.new()
-    ls.pack(root)
-    ResourceSaver.save(ls, "res://Level.tscn")
+    # küçük demo (3x3 Zemin)
+    for x in range(3):
+        for z in range(3):
+            var inst := zs.instantiate()
+            inst.position = Vector3(x * 4 + 2, 0, z * 4 + 2)
+            root.add_child(inst); inst.owner = root
+    var ls := PackedScene.new(); ls.pack(root)
+    ResourceSaver.save(ls, "res://Harita.tscn")
     print("PARTS_BUILT ok")
     quit()
