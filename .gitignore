@@ -64,3 +64,5 @@ gen_tex.py
 acg.json
 carpet_candidates.png
 tex_preview.png
+gen_tex2.py
+tex2_preview.png
