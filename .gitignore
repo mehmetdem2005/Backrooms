@@ -81,3 +81,8 @@ blender-4.2.6-linux-x64/
 /blender
 *.log
 white_render*.png
+
+*_log.txt
+white_poolroom.png
+white_hero.png
+white_bird.png
