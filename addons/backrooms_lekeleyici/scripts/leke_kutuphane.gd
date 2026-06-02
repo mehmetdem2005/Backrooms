@@ -93,11 +93,21 @@ func _alfa_uygula(img: Image, esik: float, yumusaklik: float) -> void:
 	var e := clampf(esik, 0.0, 0.95)
 	var ust := e + maxf(yumusaklik, 0.0001)
 	var olcek_a := maxf(smoothstep(e, ust, 1.0), 0.001)
+	# Dairesel yumuşak kenar (radial falloff): kare sınırı yok edilir, böylece üst
+	# üste binen damgalar görünür dikiş olmadan SÜREKLİ kire dönüşür (referans gibi).
+	var cx := (w - 1) * 0.5
+	var cy := (h - 1) * 0.5
+	var maks_r := maxf(minf(cx, cy), 1.0)
 	for y in h:
 		for x in w:
 			var c := img.get_pixel(x, y)
 			var lum := (c.r * 0.299 + c.g * 0.587 + c.b * 0.114) / maks_lum
-			c.a = clampf(smoothstep(e, ust, lum) / olcek_a, 0.0, 1.0)
+			var a := clampf(smoothstep(e, ust, lum) / olcek_a, 0.0, 1.0)
+			var dx := (x - cx) / maks_r
+			var dy := (y - cy) / maks_r
+			var rr := sqrt(dx * dx + dy * dy)
+			a *= 1.0 - smoothstep(0.72, 1.08, rr)
+			c.a = a
 			img.set_pixel(x, y, c)
 
 func _goruntu_yukle(yol: String) -> Image:

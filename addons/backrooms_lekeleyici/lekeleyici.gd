@@ -160,11 +160,7 @@ func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3, dugum: Node) -> void:
 	var teg_x := yardim.cross(n).normalized()
 	var teg_y := n.cross(teg_x).normalized()
 
-	# Lekenin yüzeyden taşmaması için izin verilen azami yarı-boyut (dünya birimi).
-	var azami_yari := INF
-	if _panel.yuzeye_sigdir and dugum is MeshInstance3D:
-		azami_yari = _yuzey_sinir(dugum as MeshInstance3D, nokta, n)
-
+	var sigdir := _panel.yuzeye_sigdir and dugum is MeshInstance3D
 	var stickerlar: Array[MeshInstance3D] = []
 	var adet := maxi(_panel.saci_sayi, 1)
 	for i in adet:
@@ -173,6 +169,14 @@ func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3, dugum: Node) -> void:
 			var ac := randf() * TAU
 			var r := sqrt(randf()) * _panel.saci_yaricap
 			merkez = nokta + teg_x * (cos(ac) * r) + teg_y * (sin(ac) * r)
+		# Her damga için yüzey kenarına mesafe. Yüzey dışına düşeni ELE (taşmasın),
+		# içindekinin boyutunu kenara sığacak şekilde kırp.
+		var azami_yari := INF
+		if sigdir:
+			var kenar := _kenar_mesafe(dugum as MeshInstance3D, merkez, n)
+			if kenar <= 0.03:
+				continue  # zemin/duvar dışında -> atla
+			azami_yari = kenar
 		var yol := _panel.rastgele_yol()
 		if yol == "":
 			continue
@@ -200,10 +204,10 @@ func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, t
 	var bmin := maxf(minf(_panel.boyut_min, _panel.boyut_max), 0.05)
 	var bmax := maxf(_panel.boyut_min, _panel.boyut_max)
 	var s := randf_range(bmin, bmax)
-	# Yüzeyden taşmasın: kare köşeleri de sığsın diye yarı-köşegen (s*0.5*√2)
-	# azami sınırı geçmemeli -> s <= azami_yari * 2 / √2.
+	# Yüzeyden taşmasın: dairesel falloff sayesinde köşeler zaten sönük olduğundan
+	# kenara kadar büyüyebilir; faint kenar bile yüzey içinde kalsın (yari*1.8).
 	if azami_yari < INF:
-		var ust := maxf(azami_yari * 1.41421, 0.04)
+		var ust := maxf(azami_yari * 1.8, 0.04)
 		s = minf(s, ust)
 	q.size = Vector2(s, s)
 	mi.mesh = q
@@ -234,8 +238,9 @@ func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, t
 	var b := Basis(teg_x, teg_y, n)
 	if _panel.rastgele_donme:
 		b = b.rotated(n, randf() * TAU)
-	# Hafif rastgele ofset farkı z-fighting/sorting'i azaltır
-	var ek := _panel.ofset + indeks * 0.0015 + randf() * 0.001
+	# Yüzeye yapışsın: ofset birikimi yok (sıralama render_priority ile yapılır),
+	# yalnızca z-fighting için minik artış. Böylece leke havada durmaz.
+	var ek := _panel.ofset + indeks * 0.0003
 	mi.transform = Transform3D(b, nokta + n * ek)
 	mi.set_meta("leke", true)
 	return mi
@@ -248,9 +253,10 @@ func _yuzey_uygun(normal: Vector3) -> bool:
 		"duvar": return absf(ny) <= 0.6
 		_: return true
 
-## Çarpılan yüzeyin kenarına dünya-uzayında en kısa mesafe. Leke bunu aşmaz
-## (taşmayı önler). Mesh AABB'sinin, yüzey normaline dik iki ekseni kullanılır.
-func _yuzey_sinir(mi: MeshInstance3D, dunya_nokta: Vector3, dunya_n: Vector3) -> float:
+## Çarpılan yüzeyin kenarına dünya-uzayında İŞARETLİ mesafe (negatif = yüzey dışı).
+## Mesh AABB'sinin, yüzey normaline dik iki ekseni kullanılır. Hem taşma elemesi
+## hem de boyut kırpması bunu kullanır.
+func _kenar_mesafe(mi: MeshInstance3D, dunya_nokta: Vector3, dunya_n: Vector3) -> float:
 	if mi.mesh == null:
 		return INF
 	var gt := mi.global_transform
@@ -263,14 +269,11 @@ func _yuzey_sinir(mi: MeshInstance3D, dunya_nokta: Vector3, dunya_n: Vector3) ->
 	var ax := absf(ln.x)
 	var ay := absf(ln.y)
 	var az := absf(ln.z)
-	var d := INF
 	if ax >= ay and ax >= az:
-		d = minf((yari.y - absf(yp.y - merkez.y)) * olcek.y, (yari.z - absf(yp.z - merkez.z)) * olcek.z)
+		return minf((yari.y - absf(yp.y - merkez.y)) * olcek.y, (yari.z - absf(yp.z - merkez.z)) * olcek.z)
 	elif ay >= ax and ay >= az:
-		d = minf((yari.x - absf(yp.x - merkez.x)) * olcek.x, (yari.z - absf(yp.z - merkez.z)) * olcek.z)
-	else:
-		d = minf((yari.x - absf(yp.x - merkez.x)) * olcek.x, (yari.y - absf(yp.y - merkez.y)) * olcek.y)
-	return maxf(d, 0.02)
+		return minf((yari.x - absf(yp.x - merkez.x)) * olcek.x, (yari.z - absf(yp.z - merkez.z)) * olcek.z)
+	return minf((yari.x - absf(yp.x - merkez.x)) * olcek.x, (yari.y - absf(yp.y - merkez.y)) * olcek.y)
 
 func _kapsayici_bul_olustur(kok: Node) -> Node3D:
 	for c in kok.get_children():

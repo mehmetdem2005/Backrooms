@@ -25,7 +25,7 @@ var esik: float = 0.22
 var yumusaklik: float = 0.12
 var islak: bool = false
 var kendinden_isikli: bool = false
-var ofset: float = 0.012                       # yüzeyden uzaklık (z-fighting önler)
+var ofset: float = 0.006                       # yüzeyden uzaklık (z-fighting önler)
 
 var _kutuphane: LekeKutuphane
 var _palet_dugmeleri: Dictionary = {}          # yol -> Button
@@ -161,7 +161,7 @@ func _arayuz_olustur() -> void:
 	_sl_saci = _kaydirici("Saçılma Adedi", 1, 12, 1, saci_sayi, func(v): saci_sayi = int(v))
 	_kaydirici("Saçılma Yarıçapı (m)", 0.0, 4.0, 0.05, saci_yaricap, func(v): saci_yaricap = v)
 	_kaydirici("Sürükleme Aralığı (m)", 0.05, 3.0, 0.05, aralik, func(v): aralik = v)
-	_kaydirici("Yüzeyden Uzaklık", 0.002, 0.1, 0.001, ofset, func(v): ofset = v)
+	_kaydirici("Yüzeyden Uzaklık", 0.002, 0.03, 0.001, ofset, func(v): ofset = v)
 
 	add_child(HSeparator.new())
 
