@@ -38,12 +38,6 @@ func _init() -> void:
     env.tonemap_mode = Environment.TONE_MAPPER_AGX
     we.environment = env
     root.add_child(we); we.owner = root
-    # küçük demo (3x3 Zemin)
-    for x in range(3):
-        for z in range(3):
-            var inst := zs.instantiate()
-            inst.position = Vector3(x * 4 + 2, 0, z * 4 + 2)
-            root.add_child(inst); inst.owner = root
     var ls := PackedScene.new(); ls.pack(root)
     ResourceSaver.save(ls, "res://Harita.tscn")
     print("PARTS_BUILT ok")

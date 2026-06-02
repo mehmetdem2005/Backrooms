@@ -129,6 +129,7 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	if sahne == null:
 		return
 	var ornek: Node3D = sahne.instantiate()
+	ornek.name = secili_ad
 	ornek.position = hedef
 	var ur: EditorUndoRedoManager = get_undo_redo()
 	ur.create_action("Parça yerleştir: " + secili_ad)

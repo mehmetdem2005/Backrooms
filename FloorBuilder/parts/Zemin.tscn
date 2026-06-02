@@ -16,6 +16,6 @@ normal_texture = ExtResource("3_8qqyi")
 ao_enabled = true
 ao_texture = ExtResource("2_xynjx")
 
-[node name="Zemin" type="MeshInstance3D" unique_id=1395185039]
+[node name="Zemin" type="MeshInstance3D" unique_id=1497709484]
 mesh = SubResource("PlaneMesh_duf1n")
 surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
