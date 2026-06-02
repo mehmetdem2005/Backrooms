@@ -19,6 +19,8 @@ var mod: String = "yok"          # "yok" | "koy" | "sil"
 var secili_ad: String = ""
 var secili_yol: String = ""
 var butonlar: Array = []
+var ayarlar: Dictionary = {}     # ad -> YerlestirmeAyari
+var secili_ayar: YerlestirmeAyari = null
 
 func _enter_tree() -> void:
 	arac = HBoxContainer.new()
@@ -53,6 +55,9 @@ func _enter_tree() -> void:
 		b.pressed.connect(_parca_modu.bind(ad, b))
 		govde.add_child(b)
 		butonlar.append(b)
+		var ay: YerlestirmeAyari = YerlestirmeAyari.new()
+		ay.resource_name = ad + " Ayarları"
+		ayarlar[ad] = ay
 
 	var sil_btn: Button = Button.new()
 	sil_btn.text = "🗑 Sil"
@@ -92,8 +97,11 @@ func _parca_modu(ad: String, btn: Button) -> void:
 	mod = "koy"
 	secili_ad = ad
 	secili_yol = parcalar[ad]["yol"]
+	secili_ayar = ayarlar[ad]
 	_butonlari_ayarla(btn)
-	durum.text = "  → KOY: %s (sahnede dokun)" % ad
+	# Seçilen parçanın ayarlarını Inspector'da göster (ölçek, döndürme, yükseklik, ızgara)
+	EditorInterface.inspect_object(secili_ayar)
+	durum.text = "  → KOY: %s (Inspector'dan ayarla → sahnede dokun)" % ad
 
 func _sil_modu(btn: Button) -> void:
 	mod = "sil"
@@ -150,13 +158,19 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	var carpma = _zemin_noktasi(kamera, ekran)
 	if carpma == null:
 		return
-	var hedef: Vector3 = _hucre_merkez(carpma)
+	# Inspector ayarları: ızgara, yükseklik, ölçek, döndürme
+	var g: float = secili_ayar.izgara if secili_ayar != null and secili_ayar.izgara > 0.001 else IZGARA
+	var yuk: float = secili_ayar.yukseklik if secili_ayar != null else 0.0
+	var hedef: Vector3 = Vector3(floorf(carpma.x / g) * g + g * 0.5, yuk, floorf(carpma.z / g) * g + g * 0.5)
 	var sahne: PackedScene = load(secili_yol) as PackedScene
 	if sahne == null:
 		return
 	var ornek: Node3D = sahne.instantiate()
 	ornek.name = secili_ad
 	ornek.position = hedef
+	if secili_ayar != null:
+		ornek.scale = Vector3.ONE * secili_ayar.olcek
+		ornek.rotation = Vector3(0.0, deg_to_rad(secili_ayar.donme_y), 0.0)
 	var ur: EditorUndoRedoManager = get_undo_redo()
 	ur.create_action("Parça yerleştir: " + secili_ad)
 	ur.add_do_method(kok, "add_child", ornek)
