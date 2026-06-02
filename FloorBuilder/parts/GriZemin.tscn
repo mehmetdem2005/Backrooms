@@ -5,8 +5,8 @@
 [ext_resource type="Texture2D" path="res://textures/gray_tile_wall_01_normal.png" id="3_phqdl"]
 [ext_resource type="Texture2D" path="res://textures/gray_tile_wall_01_roughness.png" id="4_1iw83"]
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_teglq"]
-size = Vector2(4, 4)
+[sub_resource type="BoxMesh" id="BoxMesh_teglq"]
+size = Vector3(4, 0.12, 4)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7mtkb"]
 albedo_texture = ExtResource("1_q51pa")
@@ -16,6 +16,6 @@ normal_texture = ExtResource("3_phqdl")
 ao_enabled = true
 ao_texture = ExtResource("2_qm37i")
 
-[node name="Gri Zemin" type="MeshInstance3D" unique_id=1340331938]
-mesh = SubResource("PlaneMesh_teglq")
+[node name="GriZemin" type="MeshInstance3D" unique_id=1766871733]
+mesh = SubResource("BoxMesh_teglq")
 surface_material_override/0 = SubResource("StandardMaterial3D_7mtkb")

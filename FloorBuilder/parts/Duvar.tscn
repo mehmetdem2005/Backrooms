@@ -15,11 +15,10 @@ normal_enabled = true
 normal_texture = ExtResource("3_0c6nv")
 ao_enabled = true
 ao_texture = ExtResource("2_vj5y6")
-uv1_scale = Vector3(2, 1.5, 1)
 
-[node name="Duvar" type="Node3D" unique_id=52626433]
+[node name="Duvar" type="Node3D" unique_id=1451380388]
 
-[node name="Yuzey" type="MeshInstance3D" parent="." unique_id=202549670]
+[node name="Yuzey" type="MeshInstance3D" parent="." unique_id=725147051]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 mesh = SubResource("BoxMesh_salpc")
 surface_material_override/0 = SubResource("StandardMaterial3D_vxr35")

@@ -8,9 +8,9 @@ const IZGARA: float = 4.0
 
 # Parça: Türkçe ad -> { yol, ikon }. Yeni parça buraya eklenir.
 var parcalar: Dictionary = {
-	"Zemin": {"yol": "res://parts/Zemin.tscn", "ikon": "res://textures/floor_albedo.png"},
-	"Gri Zemin": {"yol": "res://parts/GriZemin.tscn", "ikon": "res://textures/gray_tile_wall_01_albedo.png"},
-	"Duvar": {"yol": "res://parts/Duvar.tscn", "ikon": "res://textures/gray_tile_wall_clean_albedo.png"},
+	"Zemin": {"yol": "res://parts/Zemin.tscn", "ikon": "res://textures/floor_albedo.png", "eksen": "y", "kal": 0.12},
+	"Gri Zemin": {"yol": "res://parts/GriZemin.tscn", "ikon": "res://textures/gray_tile_wall_01_albedo.png", "eksen": "y", "kal": 0.12},
+	"Duvar": {"yol": "res://parts/Duvar.tscn", "ikon": "res://textures/gray_tile_wall_clean_albedo.png", "eksen": "z", "kal": 0.2},
 }
 
 var arac: HBoxContainer
@@ -59,6 +59,7 @@ func _enter_tree() -> void:
 		butonlar.append(b)
 		var ay: YerlestirmeAyari = YerlestirmeAyari.new()
 		ay.resource_name = ad + " Ayarları"
+		ay.kalinlik = parcalar[ad].get("kal", 0.2)
 		ayarlar[ad] = ay
 
 	var sil_btn: Button = Button.new()
@@ -173,6 +174,17 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	if secili_ayar != null:
 		ornek.scale = Vector3.ONE * secili_ayar.olcek
 		ornek.rotation = Vector3(0.0, deg_to_rad(secili_ayar.donme_y), 0.0)
+		# Kalınlık: ince ekseni Inspector'daki değere göre ayarla
+		var mi: MeshInstance3D = _mesh_bul(ornek)
+		if mi != null and mi.mesh is BoxMesh:
+			var bm: BoxMesh = (mi.mesh as BoxMesh).duplicate()
+			var sz: Vector3 = bm.size
+			if parcalar[secili_ad].get("eksen", "y") == "y":
+				sz.y = secili_ayar.kalinlik
+			else:
+				sz.z = secili_ayar.kalinlik
+			bm.size = sz
+			mi.mesh = bm
 	ornek.set_meta("yp", true)
 	var ur: EditorUndoRedoManager = get_undo_redo()
 	ur.create_action("Parça yerleştir: " + secili_ad, UndoRedo.MERGE_DISABLE, kok)
@@ -181,6 +193,15 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	ur.add_do_reference(ornek)
 	ur.add_undo_method(kok, "remove_child", ornek)
 	ur.commit_action()
+
+func _mesh_bul(n: Node) -> MeshInstance3D:
+	if n is MeshInstance3D:
+		return n
+	for c: Node in n.get_children():
+		var r: MeshInstance3D = _mesh_bul(c)
+		if r != null:
+			return r
+	return null
 
 func _silinebilir(c: Node) -> bool:
 	if c is Camera3D or c is DirectionalLight3D or c is WorldEnvironment:
