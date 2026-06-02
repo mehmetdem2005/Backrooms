@@ -10,6 +10,7 @@ const STALKER_SCRIPT: Script = preload("res://scripts/horror/ShadowStalker.gd")
 const DUST_SCRIPT: Script = preload("res://scripts/horror/DustVolume.gd")
 const AUDIO_DIRECTOR_SCRIPT: Script = preload("res://scripts/horror/AudioDirector.gd")
 const JUMPSCARE_SCRIPT: Script = preload("res://scripts/horror/JumpscareOverlay.gd")
+const BATTERY_SCRIPT: Script = preload("res://scripts/items/BatteryPickup.gd")
 
 @export var world_seed: int = 463063
 @export var maze_width: int = 33
@@ -44,9 +45,19 @@ func _ready() -> void:
     _create_reflection_probes()
     _create_atmosphere_particles()
     _create_ui()
+    _create_items()
     _create_stalker()
     _create_audio_director()
     _connect_exit()
+
+func _create_items() -> void:
+    if level_builder == null:
+        return
+    for pos: Vector3 in level_builder.battery_positions:
+        var battery: Area3D = BATTERY_SCRIPT.new()
+        battery.hud = hud
+        add_child(battery)
+        battery.global_position = pos
 
 func _process(delta: float) -> void:
     if game_finished:

@@ -28,6 +28,7 @@ var start_world_position: Vector3 = Vector3.ZERO
 var exit_world_position: Vector3 = Vector3.ZERO
 var enemy_world_position: Vector3 = Vector3.ZERO
 var fixture_positions: Array[Vector3] = []
+var battery_positions: Array[Vector3] = []
 var chunks: Array[Node3D] = []
 var exit_area: Area3D
 var event_positions: Array[Vector3] = []
@@ -377,6 +378,26 @@ func _collect_open_cells() -> void:
             for x: int in range(grid_width):
                 if _get_cell(f, x, z) == 0:
                     _open_cells.append(Vector3i(x, f, z))
+    _pick_items()
+
+func _pick_items() -> void:
+    # Pil bataryaları: başlangıçtan uzak, dağınık açık hücreler (hayatta kalma kaynağı).
+    battery_positions.clear()
+    if _open_cells.is_empty():
+        return
+    var want: int = clamp(int(_open_cells.size() / 90), 6, 16)
+    var tries: int = want * 12
+    var used: Dictionary = {}
+    while battery_positions.size() < want and tries > 0:
+        tries -= 1
+        var cell: Vector3i = _open_cells[_rng.randi_range(0, _open_cells.size() - 1)]
+        var keyc: String = "%d:%d:%d" % [cell.y, cell.x, cell.z]
+        if used.has(keyc) or cell == start_cell or _water_cells.has(keyc):
+            continue
+        if _cell_distance_squared(cell, start_cell) < 36.0:
+            continue
+        used[keyc] = true
+        battery_positions.append(grid_to_world(cell, 0.55))
 
 func _cell_distance_squared(a: Vector3i, b: Vector3i) -> float:
     var dx: int = a.x - b.x

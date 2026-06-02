@@ -86,6 +86,9 @@ func _update_sanity(delta: float) -> void:
 func get_sanity() -> float:
     return clamp(sanity, 0.0, 1.0)
 
+func add_flashlight_battery(amount: float) -> void:
+    flashlight_energy = clamp(flashlight_energy + amount, 0.0, 1.0)
+
 func _unhandled_input(event: InputEvent) -> void:
     if lock_controls:
         return
