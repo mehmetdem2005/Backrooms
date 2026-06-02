@@ -75,3 +75,10 @@ white_scene.py
 white_render.png
 white_render.log
 game_src/textures/white_wall_*
+
+# Blender (yerel araç, repoya girmesin)
+blender-4.2.6-linux-x64/
+/blender
+*.log
+white_render*.png
+PYEOF_*
