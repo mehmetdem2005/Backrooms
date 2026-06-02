@@ -66,3 +66,8 @@ carpet_candidates.png
 tex_preview.png
 gen_tex2.py
 tex2_preview.png
+blender
+blender-*-linux-x64/
+make_plans.py
+plan_*.png
+blender.tar.xz
