@@ -6,6 +6,9 @@ extends VBoxContainer
 
 signal mod_degisti(yeni_mod: String)
 signal onbellek_temizle_istendi()
+signal kirlet_istendi(kapsam: String)     # "secili" | "tum"
+signal kir_temizle_istendi()
+signal atmosfer_istendi()
 
 # --- Durum (eklenti bunları okur) ---
 var mod: String = "yok"                       # "yok" | "boya" | "sil"
@@ -26,6 +29,11 @@ var yumusaklik: float = 0.12
 var islak: bool = false
 var kendinden_isikli: bool = false
 var ofset: float = 0.006                       # yüzeyden uzaklık (z-fighting önler)
+# --- Otomatik kirletme (MultiMesh) ---
+var kir_yogunluk: int = 22                     # m² başına grime damgası
+var kir_islaklik: float = 0.8                  # 0 mat .. 1 ıslak/parlak
+var kir_kenar: float = 0.6                     # kenarlara/derzlere yoğunlaşma
+var kir_koyuluk: float = 0.85                  # çamur koyuluğu (0 açık .. 1 koyu)
 
 var _kutuphane: LekeKutuphane
 var _palet_dugmeleri: Dictionary = {}          # yol -> Button
@@ -220,6 +228,48 @@ func _arayuz_olustur() -> void:
 	_isik_chk.button_pressed = kendinden_isikli
 	_isik_chk.toggled.connect(func(v): kendinden_isikli = v)
 	add_child(_isik_chk)
+
+	add_child(HSeparator.new())
+
+	# --- OTOMATİK KİRLETME (MultiMesh, elle boyamadan) ---
+	var ok_baslik := Label.new()
+	ok_baslik.text = "🌫 OTOMATİK KİRLETME (MultiMesh)"
+	ok_baslik.add_theme_font_size_override("font_size", 14)
+	add_child(ok_baslik)
+	var ok_aciklama := Label.new()
+	ok_aciklama.text = "Seçili yüzeyleri ya da tüm parçaları tek tıkla profesyonel, ıslak, kenarlarda yoğunlaşan kire boğar. Tek MultiMesh = hızlı."
+	ok_aciklama.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ok_aciklama.modulate = Color(0.7, 0.78, 0.7)
+	add_child(ok_aciklama)
+	_kaydirici("Yoğunluk (m²/adet)", 4, 80, 1, kir_yogunluk, func(v): kir_yogunluk = int(v))
+	_kaydirici("Islaklık / parlaklık", 0.0, 1.0, 0.01, kir_islaklik, func(v): kir_islaklik = v)
+	_kaydirici("Kenar yoğunlaşması", 0.0, 1.0, 0.01, kir_kenar, func(v): kir_kenar = v)
+	_kaydirici("Koyuluk", 0.0, 1.0, 0.01, kir_koyuluk, func(v): kir_koyuluk = v)
+	var kir_sat := HBoxContainer.new()
+	add_child(kir_sat)
+	var kir_sec_btn := Button.new()
+	kir_sec_btn.text = "Seçiliyi kirlet"
+	kir_sec_btn.custom_minimum_size = Vector2(0, 38)
+	kir_sec_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kir_sec_btn.pressed.connect(func(): kirlet_istendi.emit("secili"))
+	kir_sat.add_child(kir_sec_btn)
+	var kir_tum_btn := Button.new()
+	kir_tum_btn.text = "Tümünü kirlet"
+	kir_tum_btn.custom_minimum_size = Vector2(0, 38)
+	kir_tum_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kir_tum_btn.pressed.connect(func(): kirlet_istendi.emit("tum"))
+	kir_sat.add_child(kir_tum_btn)
+	var kir_temiz_btn := Button.new()
+	kir_temiz_btn.text = "Otomatik kiri temizle"
+	kir_temiz_btn.modulate = Color(1.0, 0.8, 0.8)
+	kir_temiz_btn.pressed.connect(func(): kir_temizle_istendi.emit())
+	add_child(kir_temiz_btn)
+	var atm_btn := Button.new()
+	atm_btn.text = "🌑 Karanlık ıslak atmosfer kur"
+	atm_btn.tooltip_text = "Koyu WorldEnvironment + tavan ışıkları ekler (ıslak yansıma görünür olur)"
+	atm_btn.custom_minimum_size = Vector2(0, 38)
+	atm_btn.pressed.connect(func(): atmosfer_istendi.emit())
+	add_child(atm_btn)
 
 	add_child(HSeparator.new())
 	var ipucu := Label.new()

@@ -2,10 +2,12 @@
 
 [sub_resource type="Environment" id="Environment_ueg10"]
 background_mode = 1
-background_color = Color(0.1, 0.11, 0.13, 1)
+background_color = Color(0.012, 0.013, 0.016, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.92, 0.93, 0.95, 1)
+ambient_light_color = Color(0.1, 0.11, 0.14, 1)
+ambient_light_energy = 0.45
 tonemap_mode = 4
+ssr_enabled = true
 
 [node name="Harita" type="Node3D" unique_id=48286236]
 

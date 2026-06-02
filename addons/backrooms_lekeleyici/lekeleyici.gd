@@ -26,6 +26,9 @@ func _enter_tree() -> void:
 	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_panel.kur(_kutuphane)
 	_panel.onbellek_temizle_istendi.connect(_kutuphane.onbellegi_temizle)
+	_panel.kirlet_istendi.connect(_kirlet)
+	_panel.kir_temizle_istendi.connect(_kir_temizle)
+	_panel.atmosfer_istendi.connect(_atmosfer_kur)
 	# Uzun içerik için kaydırılabilir kapsayıcıya sar.
 	_dock = ScrollContainer.new()
 	_dock.name = "Lekeleyici"
@@ -336,3 +339,259 @@ func _lekeleri_topla(n: Node, dizi: Array[Node]) -> void:
 		dizi.append(n)
 	for c in n.get_children():
 		_lekeleri_topla(c, dizi)
+
+# ============================================================================
+# OTOMATİK KİRLETME (MultiMesh) — yüzeyleri elle boyamadan profesyonel,
+# ıslak, kenarlarda yoğunlaşan kire boğar. Her doku için TEK MultiMesh = hızlı.
+# ============================================================================
+
+func _kirlet(kapsam: String) -> void:
+	var kok := EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	var hedefler := _hedef_meshler(kapsam, kok)
+	if hedefler.is_empty():
+		_panel._durum.text = "Kirletilecek yüzey yok (parça yerleştir ya da bir mesh seç)"
+		return
+	if _kutuphane.yollar.is_empty():
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Otomatik kirlet (%d yüzey)" % hedefler.size(), UndoRedo.MERGE_DISABLE, kok)
+	var sayac := 0
+	for mi in hedefler:
+		for mmi in _yuzey_kirlet(mi):
+			ur.add_do_method(mi, "add_child", mmi, true)
+			ur.add_do_method(mmi, "set_owner", kok)
+			ur.add_do_reference(mmi)
+			ur.add_undo_method(mi, "remove_child", mmi)
+			sayac += 1
+	ur.commit_action()
+	_panel._durum.text = "Kirletildi: %d yüzey, %d MultiMesh katmanı" % [hedefler.size(), sayac]
+
+# Bir mesh yüzeyine, palet dokularına bölünmüş MultiMesh grime katmanları üretir.
+func _yuzey_kirlet(mi: MeshInstance3D) -> Array[MultiMeshInstance3D]:
+	var sonuc: Array[MultiMeshInstance3D] = []
+	if mi.mesh == null:
+		return sonuc
+	var aabb := mi.mesh.get_aabb()
+	var sz := aabb.size
+	var merkez := aabb.position + sz * 0.5
+	# İnce eksen = yüzey normali; diğer ikisi yüzey düzlemi (u, v)
+	var ei := 0
+	if sz.y <= sz.x and sz.y <= sz.z: ei = 1
+	elif sz.z <= sz.x and sz.z <= sz.y: ei = 2
+	var eks := [Vector3.RIGHT, Vector3.UP, Vector3(0, 0, 1)]
+	var ui := (ei + 1) % 3
+	var vi := (ei + 2) % 3
+	var n_yon: Vector3 = eks[ei]
+	var u_yon: Vector3 = eks[ui]
+	var v_yon: Vector3 = eks[vi]
+	var hu: float = sz[ui] * 0.5
+	var hv: float = sz[vi] * 0.5
+	var thin: float = sz[ei] * 0.5 + 0.006
+	var alan: float = (hu * 2.0) * (hv * 2.0)
+	var toplam := clampi(int(alan * float(_panel.kir_yogunluk)), 10, 6000)
+
+	var dokular := _aktif_dokular()
+	if dokular.is_empty():
+		return sonuc
+	var kenar := _panel.kir_kenar
+	for di in dokular.size():
+		var pay := int(toplam / dokular.size())
+		if di == 0:
+			pay += toplam % dokular.size()
+		if pay <= 0:
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		if _birim_quad == null:
+			_birim_quad = QuadMesh.new()
+			_birim_quad.size = Vector2(1, 1)
+		mm.mesh = _birim_quad
+		mm.instance_count = pay
+		for i in pay:
+			var u := _kenar_bias(hu, kenar)
+			var v := _kenar_bias(hv, kenar)
+			var olc := randf_range(0.22, 0.6) * (hu + hv)
+			var b := Basis(u_yon * olc, v_yon * olc, n_yon).rotated(n_yon, randf() * TAU)
+			var p := merkez + u_yon * u + v_yon * v + n_yon * thin
+			mm.set_instance_transform(i, Transform3D(b, p))
+			mm.set_instance_color(i, Color(1, 1, 1, randf_range(0.45, 0.95)))
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "OtoKir"
+		mmi.multimesh = mm
+		mmi.material_override = _islak_grime_materyali(dokular[di])
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.set_meta("oto_kir", true)
+		sonuc.append(mmi)
+	return sonuc
+
+# Kenarlara/derzlere yoğunlaşan rastgele konum. kenar: 0 düzgün .. 1 güçlü kenar.
+func _kenar_bias(yari: float, kenar: float) -> float:
+	var t := randf()
+	var us := 1.0 + kenar * 3.0
+	t = 1.0 - pow(1.0 - t, us)        # t -> 1'e (kenara) eğilim
+	var taban := lerpf(randf(), t, kenar)
+	return yari * taban * (1.0 if randf() < 0.5 else -1.0)
+
+func _islak_grime_materyali(yol: String) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var tex := _kutuphane.alfa_doku(yol, 0.14, 0.14, 256)
+	mat.albedo_texture = tex
+	mat.roughness_texture = tex
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.vertex_color_use_as_albedo = true     # MultiMesh renkleri -> per-instance opaklık
+	var koy := lerpf(0.18, 0.035, _panel.kir_koyuluk)
+	mat.albedo_color = Color(koy, koy * 0.88, koy * 0.72, 1.0)
+	var isl := _panel.kir_islaklik
+	mat.roughness = lerpf(0.92, 0.13, isl)
+	mat.metallic = 0.0
+	mat.metallic_specular = lerpf(0.5, 1.0, isl)
+	if isl > 0.2:
+		mat.clearcoat_enabled = true
+		mat.clearcoat = isl
+		mat.clearcoat_roughness = lerpf(0.3, 0.05, isl)
+	return mat
+
+func _aktif_dokular() -> Array[String]:
+	var liste: Array[String] = []
+	for y in _panel.aktif_yollar:
+		liste.append(y)
+	if liste.is_empty():
+		for y in _kutuphane.yollar:
+			liste.append(y)
+	# Çok fazla katman olmasın diye en çok 6 doku kullan
+	if liste.size() > 6:
+		liste.shuffle()
+		liste = liste.slice(0, 6)
+	return liste
+
+# Hedef mesh'leri topla (otomatik kir / leke düğümleri hariç).
+func _hedef_meshler(kapsam: String, kok: Node) -> Array[MeshInstance3D]:
+	var sonuc: Array[MeshInstance3D] = []
+	if kapsam == "secili":
+		for s in EditorInterface.get_selection().get_selected_nodes():
+			_meshleri_topla(s, sonuc)
+	else:
+		_meshleri_topla(kok, sonuc)
+	return sonuc
+
+func _meshleri_topla(n: Node, dizi: Array[MeshInstance3D]) -> void:
+	if n.has_meta("oto_kir") or n.has_meta("leke") or n.has_meta("leke_kapsayici"):
+		return
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+		dizi.append(n)
+	for c in n.get_children():
+		_meshleri_topla(c, dizi)
+
+func _kir_temizle() -> void:
+	var kok := EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	var kirler: Array[Node] = []
+	_oto_kir_topla(kok, kirler)
+	if kirler.is_empty():
+		_panel._durum.text = "Otomatik kir yok"
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Otomatik kiri temizle (%d)" % kirler.size(), UndoRedo.MERGE_DISABLE, kok)
+	for k in kirler:
+		var eb := k.get_parent()
+		ur.add_do_method(eb, "remove_child", k)
+		ur.add_undo_method(eb, "add_child", k, true)
+		ur.add_undo_method(k, "set_owner", kok)
+		ur.add_undo_reference(k)
+	ur.commit_action()
+	_panel._durum.text = "Otomatik kir temizlendi (%d katman)" % kirler.size()
+
+func _oto_kir_topla(n: Node, dizi: Array[Node]) -> void:
+	if n.has_meta("oto_kir"):
+		dizi.append(n)
+		return
+	for c in n.get_children():
+		_oto_kir_topla(c, dizi)
+
+# Koyu ıslak atmosfer: WorldEnvironment (karanlık) + tavan ışıkları. Yansıma görünür olur.
+func _atmosfer_kur() -> void:
+	var kok := EditorInterface.get_edited_scene_root()
+	if kok == null:
+		_panel._durum.text = "Önce sahneyi aç"
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Karanlık ıslak atmosfer", UndoRedo.MERGE_DISABLE, kok)
+
+	# WorldEnvironment (varsa güncelle, yoksa ekle)
+	var we: WorldEnvironment = null
+	for c in kok.get_children():
+		if c is WorldEnvironment:
+			we = c
+			break
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.012, 0.013, 0.016)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.10, 0.11, 0.14)
+	env.ambient_light_energy = 0.45
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.ssr_enabled = true
+	env.ssr_max_steps = 48
+	if we == null:
+		var yeni := WorldEnvironment.new()
+		yeni.name = "Ortam"
+		yeni.environment = env
+		ur.add_do_method(kok, "add_child", yeni, true)
+		ur.add_do_method(yeni, "set_owner", kok)
+		ur.add_do_reference(yeni)
+		ur.add_undo_method(kok, "remove_child", yeni)
+	else:
+		var eski := we.environment
+		ur.add_do_property(we, "environment", env)
+		ur.add_undo_property(we, "environment", eski)
+
+	# Tavan ışıkları (parçaların kapladığı alanın üstüne dizi)
+	var aabb := _sahne_sinir(kok)
+	var grup := Node3D.new()
+	grup.name = "IslakIsiklar"
+	grup.set_meta("oto_kir", true)
+	var merkez := aabb.position + aabb.size * 0.5
+	var ust := aabb.position.y + maxf(aabb.size.y, 2.5) + 0.5
+	var adimx := maxf(aabb.size.x, 4.0)
+	var adimz := maxf(aabb.size.z, 4.0)
+	var nx := clampi(int(adimx / 4.0), 1, 6)
+	var nz := clampi(int(adimz / 4.0), 1, 6)
+	for ix in nx:
+		for iz in nz:
+			var om := OmniLight3D.new()
+			var x := lerpf(aabb.position.x + 1.0, aabb.position.x + aabb.size.x - 1.0, 0.5 if nx == 1 else float(ix) / float(nx - 1))
+			var z := lerpf(aabb.position.z + 1.0, aabb.position.z + aabb.size.z - 1.0, 0.5 if nz == 1 else float(iz) / float(nz - 1))
+			om.position = Vector3(x, ust, z)
+			om.light_energy = 2.2
+			om.omni_range = maxf(adimx, adimz) * 0.6 + 4.0
+			om.light_color = Color(1.0, 0.95, 0.82)
+			grup.add_child(om)
+			om.owner = grup
+	ur.add_do_method(kok, "add_child", grup, true)
+	ur.add_do_method(grup, "set_owner", kok)
+	ur.add_do_reference(grup)
+	ur.add_undo_method(kok, "remove_child", grup)
+	ur.commit_action()
+	_panel._durum.text = "Karanlık ıslak atmosfer kuruldu (env + %d ışık)" % (nx * nz)
+
+func _sahne_sinir(kok: Node) -> AABB:
+	var ilk := true
+	var sonuc := AABB()
+	var meshler: Array[MeshInstance3D] = []
+	_meshleri_topla(kok, meshler)
+	for mi in meshler:
+		var ga := mi.global_transform * mi.mesh.get_aabb()
+		if ilk:
+			sonuc = ga
+			ilk = false
+		else:
+			sonuc = sonuc.merge(ga)
+	if ilk:
+		sonuc = AABB(Vector3(-6, 0, -6), Vector3(12, 3, 12))
+	return sonuc
