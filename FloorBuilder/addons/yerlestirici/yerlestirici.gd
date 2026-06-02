@@ -9,6 +9,7 @@ const IZGARA: float = 4.0
 # Parça: Türkçe ad -> { yol, ikon }. Yeni parça buraya eklenir.
 var parcalar: Dictionary = {
 	"Zemin": {"yol": "res://parts/Zemin.tscn", "ikon": "res://textures/floor_albedo.png"},
+	"Gri Zemin": {"yol": "res://parts/GriZemin.tscn", "ikon": "res://textures/gray_tile_wall_01_albedo.png"},
 }
 
 var arac: HBoxContainer
