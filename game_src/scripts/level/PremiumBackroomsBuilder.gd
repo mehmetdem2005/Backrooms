@@ -29,6 +29,8 @@ var exit_world_position: Vector3 = Vector3.ZERO
 var enemy_world_position: Vector3 = Vector3.ZERO
 var fixture_positions: Array[Vector3] = []
 var battery_positions: Array[Vector3] = []
+var fake_exit_positions: Array[Vector3] = []
+var fake_exit_dirs: Array[Vector3] = []
 var chunks: Array[Node3D] = []
 var exit_area: Area3D
 var event_positions: Array[Vector3] = []
@@ -61,6 +63,7 @@ var _tile_material: Material
 var _grate_material: Material
 var _ceiling_grid_material: Material
 var _emissive_material: Material
+var _emissive_red_material: Material
 var _exit_material: Material
 var _ramp_material: Material
 
@@ -398,6 +401,29 @@ func _pick_items() -> void:
             continue
         used[keyc] = true
         battery_positions.append(grid_to_world(cell, 0.55))
+    _pick_fake_exits()
+
+func _pick_fake_exits() -> void:
+    # Sahte çıkışlar: duvar komşusu açık hücrelerde, çıkış gibi görünen tuzak tabelalar.
+    fake_exit_positions.clear()
+    fake_exit_dirs.clear()
+    if _open_cells.is_empty():
+        return
+    var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+    var want: int = 5
+    var tries: int = want * 16
+    while fake_exit_positions.size() < want and tries > 0:
+        tries -= 1
+        var cell: Vector3i = _open_cells[_rng.randi_range(0, _open_cells.size() - 1)]
+        if cell == start_cell or _water_cells.has("%d:%d:%d" % [cell.y, cell.x, cell.z]):
+            continue
+        for d: Vector2i in dirs:
+            if _get_cell(cell.y, cell.x + d.x, cell.z + d.y) != 0:
+                var center: Vector3 = grid_to_world(cell, 0.0)
+                var wall_off: float = cell_size * 0.5 - 0.08
+                fake_exit_positions.append(center + Vector3(float(d.x) * wall_off, 1.45, float(d.y) * wall_off))
+                fake_exit_dirs.append(Vector3(-float(d.x), 0.0, -float(d.y)))
+                break
 
 func _cell_distance_squared(a: Vector3i, b: Vector3i) -> float:
     var dx: int = a.x - b.x
@@ -574,9 +600,11 @@ func _build_geometry() -> void:
                     if _should_fixture(cell):
                         var fp: Vector3 = center + Vector3(0.0, ceiling_height - 0.08, 0.0)
                         fixture_positions.append(fp)
+                        # Kırmızı ışık bölgesi: bazı armatürler kırmızı (tedirgin edici)
+                        var ft: String = "fixture_red" if _is_red_zone(cell) else "fixture"
                         _bpush(bucket, "housing", _scaled_transform(Vector3(cell_size * 0.72, 0.13, 0.60), fp + Vector3(0.0, 0.05, 0.0)))
-                        _bpush(bucket, "fixture", _scaled_transform(Vector3(cell_size * 0.58, 0.05, 0.12), fp + Vector3(0.0, 0.0, -0.13)))
-                        _bpush(bucket, "fixture", _scaled_transform(Vector3(cell_size * 0.58, 0.05, 0.12), fp + Vector3(0.0, 0.0, 0.13)))
+                        _bpush(bucket, ft, _scaled_transform(Vector3(cell_size * 0.58, 0.05, 0.12), fp + Vector3(0.0, 0.0, -0.13)))
+                        _bpush(bucket, ft, _scaled_transform(Vector3(cell_size * 0.58, 0.05, 0.12), fp + Vector3(0.0, 0.0, 0.13)))
                     # Tavan havalandırma ızgarası (paslı metal grate)
                     if not is_water and _should_vent(cell):
                         _bpush(bucket, "vent", _scaled_transform(Vector3(cell_size * 0.5, 0.04, cell_size * 0.3), center + Vector3(0.0, ceiling_height - 0.10, 0.0)))
@@ -713,6 +741,7 @@ func _chunk_type_info(type_name: String) -> Array:
         "vent": return [false, _grate_material]
         "housing": return [false, _metal_material]
         "fixture": return [false, _emissive_material]
+        "fixture_red": return [false, _emissive_red_material]
         "ramp": return [false, _ramp_material]
     return [false, _wall_material]
 
@@ -822,6 +851,11 @@ func _should_vent(cell: Vector3i) -> bool:
     var h: int = abs(cell.x * 19349663 ^ cell.z * 83492791 ^ (world_seed + cell.y * 11))
     return h % 13 == 0
 
+func _is_red_zone(cell: Vector3i) -> bool:
+    # 5x5 bloklar halinde kümelenmiş kırmızı ışık cepleri (tek tek değil, bölge hissi)
+    var h: int = abs(int(cell.x / 5) * 49979687 ^ int(cell.z / 5) * 86028121 ^ (world_seed + cell.y * 13))
+    return h % 7 == 0
+
 func _box_mesh() -> BoxMesh:
     if _box_mesh_shared == null:
         _box_mesh_shared = BoxMesh.new()
@@ -910,6 +944,15 @@ func _create_materials() -> void:
     emissive.emission = Color(1.0, 0.95, 0.72, 1.0)
     emissive.emission_energy_multiplier = 4.6
     _emissive_material = emissive
+
+    # Kırmızı ışık bölgesi armatürü (tedirgin edici cepler)
+    var emissive_red: StandardMaterial3D = StandardMaterial3D.new()
+    emissive_red.albedo_color = Color(0.9, 0.2, 0.18, 1.0)
+    emissive_red.roughness = 0.2
+    emissive_red.emission_enabled = true
+    emissive_red.emission = Color(1.0, 0.10, 0.06, 1.0)
+    emissive_red.emission_energy_multiplier = 4.0
+    _emissive_red_material = emissive_red
 
 func _make_pbr(set_name: String, tint: Color, metallic_value: float, rough_value: float, uv_scale: Vector3, use_normal: bool, use_roughness: bool = false) -> StandardMaterial3D:
     var m: StandardMaterial3D = StandardMaterial3D.new()

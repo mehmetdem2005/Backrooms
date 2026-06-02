@@ -11,6 +11,7 @@ const DUST_SCRIPT: Script = preload("res://scripts/horror/DustVolume.gd")
 const AUDIO_DIRECTOR_SCRIPT: Script = preload("res://scripts/horror/AudioDirector.gd")
 const JUMPSCARE_SCRIPT: Script = preload("res://scripts/horror/JumpscareOverlay.gd")
 const BATTERY_SCRIPT: Script = preload("res://scripts/items/BatteryPickup.gd")
+const FAKE_EXIT_SCRIPT: Script = preload("res://scripts/items/FakeExit.gd")
 
 @export var world_seed: int = 463063
 @export var maze_width: int = 33
@@ -58,6 +59,16 @@ func _create_items() -> void:
         battery.hud = hud
         add_child(battery)
         battery.global_position = pos
+    # Sahte çıkışlar (tuzak EXIT tabelaları)
+    for i: int in range(level_builder.fake_exit_positions.size()):
+        var fx: Node3D = FAKE_EXIT_SCRIPT.new()
+        fx.hud = hud
+        fx.light_manager = light_manager
+        add_child(fx)
+        fx.global_position = level_builder.fake_exit_positions[i]
+        var d: Vector3 = level_builder.fake_exit_dirs[i]
+        if d.length() > 0.1:
+            fx.rotation.y = atan2(d.x, d.z)
 
 func _process(delta: float) -> void:
     if game_finished:
