@@ -1,16 +1,19 @@
 @tool
 extends EditorPlugin
-## Parça Yerleştirici (dokunmatik): butonlar 3B görünümün ÜST araç çubuğunda.
-## Bir mod seç (parça=KOY, ya da SİL), sonra sahnede DOKUN. Izgara: 4 m.
+## Parça Yerleştirici (dokunmatik):
+## Üst panelde parçanın GÖRSELİNE dokunarak seç → sonra sahnede dokun = yerleşir.
+## Panel KÜÇÜLT/BÜYÜT düğmeli (ekranı kaplamaz). Izgara: 4 m.
 
 const IZGARA: float = 4.0
 
-# Parça listesi: Türkçe ad -> sahne yolu. Yeni parça buraya eklenir.
+# Parça: Türkçe ad -> { yol, ikon }. Yeni parça buraya eklenir.
 var parcalar: Dictionary = {
-	"Zemin": "res://parts/Zemin.tscn",
+	"Zemin": {"yol": "res://parts/Zemin.tscn", "ikon": "res://textures/floor_albedo.png"},
 }
 
 var arac: HBoxContainer
+var govde: HBoxContainer
+var kucult_btn: Button
 var durum: Label
 var mod: String = "yok"          # "yok" | "koy" | "sil"
 var secili_ad: String = ""
@@ -21,34 +24,53 @@ func _enter_tree() -> void:
 	arac = HBoxContainer.new()
 	arac.add_theme_constant_override("separation", 6)
 
-	var baslik: Label = Label.new()
-	baslik.text = "🧩 Yerleştir:"
-	arac.add_child(baslik)
+	# KÜÇÜLT/BÜYÜT düğmesi
+	kucult_btn = Button.new()
+	kucult_btn.text = "🧩 ▾"
+	kucult_btn.toggle_mode = true
+	kucult_btn.button_pressed = true
+	kucult_btn.tooltip_text = "Paneli küçült / büyüt"
+	kucult_btn.toggled.connect(_kucult_buyut)
+	arac.add_child(kucult_btn)
 
+	# GÖVDE (küçültülünce gizlenen kısım)
+	govde = HBoxContainer.new()
+	govde.add_theme_constant_override("separation", 6)
+	arac.add_child(govde)
+
+	# Parça butonları — GÖRSELLİ (önizleme ikonu + ad)
 	for ad: String in parcalar.keys():
 		var b: Button = Button.new()
-		b.text = ad
+		b.text = " " + ad
 		b.toggle_mode = true
+		var ikon_yolu: String = parcalar[ad]["ikon"]
+		var tex: Texture2D = load(ikon_yolu) as Texture2D
+		if tex != null:
+			b.icon = tex
+			b.expand_icon = true
+			b.add_theme_constant_override("icon_max_width", 40)
+		b.custom_minimum_size = Vector2(0, 44)
 		b.pressed.connect(_parca_modu.bind(ad, b))
-		arac.add_child(b)
+		govde.add_child(b)
 		butonlar.append(b)
 
 	var sil_btn: Button = Button.new()
 	sil_btn.text = "🗑 Sil"
 	sil_btn.toggle_mode = true
+	sil_btn.modulate = Color(1.0, 0.75, 0.75)
 	sil_btn.pressed.connect(_sil_modu.bind(sil_btn))
-	arac.add_child(sil_btn)
+	govde.add_child(sil_btn)
 	butonlar.append(sil_btn)
 
 	var dur_btn: Button = Button.new()
 	dur_btn.text = "✋ Dur"
 	dur_btn.pressed.connect(_durdur)
-	arac.add_child(dur_btn)
+	govde.add_child(dur_btn)
 
 	durum = Label.new()
 	durum.text = "  (mod: yok)"
 	durum.modulate = Color(0.6, 0.85, 1.0)
-	arac.add_child(durum)
+	govde.add_child(durum)
 
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, arac)
 
@@ -58,6 +80,10 @@ func _exit_tree() -> void:
 		arac.queue_free()
 		arac = null
 
+func _kucult_buyut(acik: bool) -> void:
+	govde.visible = acik
+	kucult_btn.text = "🧩 ▾" if acik else "🧩 ▸"
+
 func _butonlari_ayarla(aktif: Button) -> void:
 	for b: Button in butonlar:
 		b.button_pressed = (b == aktif)
@@ -65,7 +91,7 @@ func _butonlari_ayarla(aktif: Button) -> void:
 func _parca_modu(ad: String, btn: Button) -> void:
 	mod = "koy"
 	secili_ad = ad
-	secili_yol = parcalar[ad]
+	secili_yol = parcalar[ad]["yol"]
 	_butonlari_ayarla(btn)
 	durum.text = "  → KOY: %s (sahnede dokun)" % ad
 
