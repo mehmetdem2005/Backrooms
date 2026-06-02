@@ -59,3 +59,12 @@ Fra:1 Mem:112.48M (Peak 112.48M) | Time:00:00.45 | Remaining:00:48.40 | Mem:100.
 Fra:1 Mem:112.48M (Peak 112.48M) | Time:00:24.29 | Remaining:00:21.21 | Mem:100.66M, Peak:100.66M | Scene, ViewLayer | Sample 64/120
 Fra:1 Mem:112.48M (Peak 112.48M) | Time:00:27.16 | Remaining:00:13.55 | Mem:100.66M, Peak:100.66M | Scene, ViewLayer | Sample 80/120
 Fra:1 Mem:112.48M (Peak 112.48M) | Time:00:29.54 | Remaining:00:07.37 | Mem:100.66M, Peak:100.66M | Scene, ViewLayer | Sample 96/120
+Fra:1 Mem:112.48M (Peak 112.48M) | Time:00:31.55 | Remaining:00:02.25 | Mem:100.66M, Peak:100.66M | Scene, ViewLayer | Sample 112/120
+Fra:1 Mem:147.64M (Peak 200.38M) | Time:00:36.93 | Mem:100.66M, Peak:100.66M | Scene, ViewLayer | Sample 120/120
+Fra:1 Mem:147.64M (Peak 200.38M) | Time:00:36.93 | Mem:100.66M, Peak:100.66M | Scene, ViewLayer | Finished
+Saved: '/home/user/Backrooms/white_bird.png'
+Time: 00:37.29 (Saving: 00:00.31)
+
+BIRD2_DONE
+
+Blender quit
