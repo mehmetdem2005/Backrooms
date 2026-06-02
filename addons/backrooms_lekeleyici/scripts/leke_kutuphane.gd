@@ -75,16 +75,24 @@ func alfa_doku(yol: String, esik: float, yumusaklik: float, boyut: int = 512) ->
 	return tex
 
 func _goruntu_yukle(yol: String) -> Image:
-	# Önce import edilmiş Texture2D'den dene (editörde en güvenilir), olmazsa diskten.
+	# Editör eklentisi: kaynak PNG her zaman diskte mevcut. Import sistemine
+	# bağlı kalmadan DOĞRUDAN diskten yükle. Böylece projenin ilk açılışında
+	# (henüz import bitmemişken) bile çalışır ve "Failed loading resource"
+	# hatası üretmez.
+	var img := Image.new()
+	var mutlak := ProjectSettings.globalize_path(yol)
+	if img.load(mutlak) == OK:
+		return img
+	# Yedek 1: res:// yolundan Image.load
+	if img.load(yol) == OK:
+		return img
+	# Yedek 2: import edilmiş Texture2D
 	var t := load(yol) as Texture2D
 	if t != null:
-		var img := t.get_image()
-		if img != null:
-			return img.duplicate()
-	var disk := Image.new()
-	var hata := disk.load(yol)
-	if hata == OK:
-		return disk
+		var ti := t.get_image()
+		if ti != null:
+			return ti.duplicate()
+	push_warning("Lekeleyici: doku yüklenemedi: " + yol)
 	return null
 
 func onbellegi_temizle() -> void:

@@ -10,6 +10,9 @@ const KAPSAYICI_AD := "Lekeler"
 var _kutuphane: LekeKutuphane
 var _panel: LekePanel
 var _dock: ScrollContainer
+var _arac: HBoxContainer
+var _boya_arac_btn: Button
+var _sil_arac_btn: Button
 
 # 3B viewport sürükleme durumu
 var _basili := false
@@ -29,13 +32,44 @@ func _enter_tree() -> void:
 	_dock.add_child(_panel)
 	add_control_to_dock(EditorPlugin.DOCK_SLOT_RIGHT_BL, _dock)
 
+	# Üst bara (3B editör menüsü) görünür AÇ/KAPA düğmeleri.
+	_arac = HBoxContainer.new()
+	_arac.add_theme_constant_override("separation", 4)
+	_boya_arac_btn = Button.new()
+	_boya_arac_btn.text = "🖌 Lekele"
+	_boya_arac_btn.toggle_mode = true
+	_boya_arac_btn.tooltip_text = "Lekeleme fırçasını aç/kapat (ayarlar sağdaki 'Lekeleyici' panelinde)"
+	_boya_arac_btn.toggled.connect(func(acik: bool): _panel._mod_ayarla("boya" if acik else "yok"))
+	_arac.add_child(_boya_arac_btn)
+	_sil_arac_btn = Button.new()
+	_sil_arac_btn.text = "🧽 Sil"
+	_sil_arac_btn.toggle_mode = true
+	_sil_arac_btn.modulate = Color(1.0, 0.78, 0.78)
+	_sil_arac_btn.tooltip_text = "Leke silme modunu aç/kapat"
+	_sil_arac_btn.toggled.connect(func(acik: bool): _panel._mod_ayarla("sil" if acik else "yok"))
+	_arac.add_child(_sil_arac_btn)
+	add_control_to_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _arac)
+
+	# Panel mod değiştiğinde toolbar düğmelerini eşitle.
+	_panel.mod_degisti.connect(_arac_guncelle)
+
 func _exit_tree() -> void:
+	if _arac:
+		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _arac)
+		_arac.queue_free()
+		_arac = null
 	if _dock:
 		remove_control_from_docks(_dock)
 		_dock.queue_free()
 		_dock = null
 	_panel = null
 	_kutuphane = null
+
+func _arac_guncelle(m: String) -> void:
+	if _boya_arac_btn:
+		_boya_arac_btn.set_pressed_no_signal(m == "boya")
+	if _sil_arac_btn:
+		_sil_arac_btn.set_pressed_no_signal(m == "sil")
 
 func _handles(_o: Object) -> bool:
 	return _panel != null and _panel.mod != "yok"
