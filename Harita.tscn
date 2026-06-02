@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[sub_resource type="Environment" id="Environment_ueg10"]
+background_mode = 1
+background_color = Color(0.1, 0.11, 0.13, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.92, 0.93, 0.95, 1)
+tonemap_mode = 4
+
+[node name="Harita" type="Node3D" unique_id=48286236]
+
+[node name="Kamera" type="Camera3D" parent="." unique_id=825933082]
+transform = Transform3D(0.9938837, -0.07311503, 0.08276059, 0, 0.7494289, 0.6620847, -0.11043153, -0.6580352, 0.7448453, 10, 16, 26)
+
+[node name="Isik" type="DirectionalLight3D" parent="." unique_id=1845520138]
+transform = Transform3D(0.81915206, -0.46984634, 0.32898995, 0, 0.57357645, 0.81915206, -0.57357645, -0.6710101, 0.46984634, 0, 0, 0)
+light_energy = 0.8
+
+[node name="Ortam" type="WorldEnvironment" parent="." unique_id=1112891916]
+environment = SubResource("Environment_ueg10")
