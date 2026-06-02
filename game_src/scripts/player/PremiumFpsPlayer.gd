@@ -27,6 +27,7 @@ var is_running: bool = false
 var is_moving: bool = false
 var is_crouching: bool = false
 var stress_level: float = 0.0
+var sanity: float = 1.0               # 1 sağlıklı .. 0 delirme (karanlık+tehlikede düşer)
 var local_light: float = 0.0      # GameRoot tarafından beslenir (0=karanlık,1=floresan altında)
 
 var _head: Node3D
@@ -73,6 +74,17 @@ func _physics_process(delta: float) -> void:
     _update_movement(delta)
     _update_camera_motion(delta)
     _update_noise(delta)
+    _update_sanity(delta)
+
+func _update_sanity(delta: float) -> void:
+    # Karanlıkta + stres altında akıl düşer; aydınlık + sakin yerde yavaşça toparlanır.
+    var darkness: float = get_darkness()
+    var drain: float = darkness * 0.012 + stress_level * 0.045
+    var recover: float = 0.05 if (darkness < 0.35 and stress_level < 0.2) else 0.0
+    sanity = clamp(sanity - drain * delta + recover * delta, 0.0, 1.0)
+
+func get_sanity() -> float:
+    return clamp(sanity, 0.0, 1.0)
 
 func _unhandled_input(event: InputEvent) -> void:
     if lock_controls:
@@ -409,6 +421,11 @@ func _update_flashlight(delta: float) -> void:
         # düşük pilde rastgele kırpışma
         if flashlight_energy < 0.2 and sin(Time.get_ticks_msec() * 0.05) > 0.4:
             battery *= 0.4
+        # DÜŞÜK AKIL: fener gecikmeli/kırpışan tepki verir (plan: sanity efekti)
+        if get_sanity() < 0.5:
+            var sf: float = (0.5 - get_sanity()) * 2.0
+            if sin(Time.get_ticks_msec() * 0.041 + _shake_seed * 3.0) > 1.0 - sf * 0.7:
+                battery *= 0.25
         _flashlight.light_energy = 6.0 * battery * stress_flicker
         _flashlight.spot_range = lerp(18.0, 36.0, flashlight_energy)   # pil azaldıkça menzil kısalır
         _fill_light.light_energy = 0.4 * battery

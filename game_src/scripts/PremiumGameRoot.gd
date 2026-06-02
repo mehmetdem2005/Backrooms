@@ -31,6 +31,8 @@ var _grab_phase: int = 0
 var _grab_timer: float = 0.0
 var exit_area: Area3D
 var game_finished: bool = false
+var _calm_time: float = 0.0           # ScareDirector: oyuncu ne kadar süredir sakin
+var _scare_cooldown: float = 12.0
 
 func _ready() -> void:
     _apply_premium_runtime_settings()
@@ -68,7 +70,10 @@ func _process(delta: float) -> void:
         # Döngü harita: çıkış yok. HUD bulunduğun katı + uyarıyı gösterir.
         var floor_index: int = level_builder.world_to_grid(player.global_position).y
         var floor_name: String = ["ÜST KAT", "ORTA KAT", "ALT KAT (HAVUZ)"][clamp(floor_index, 0, 2)]
-        hud.set_status("%s — çıkış yok, hayatta kal" % floor_name)
+        var sanity_warn: String = ""
+        if player.get_sanity() < 0.4:
+            sanity_warn = "  •  AKLIN BULANIYOR…"
+        hud.set_status("%s — çıkış yok, hayatta kal%s" % [floor_name, sanity_warn])
         hud.set_stamina(player.stamina)
         hud.set_flashlight_energy(player.flashlight_energy)
         hud.set_noise_level(player.get_noise_level())
@@ -82,10 +87,37 @@ func _process(delta: float) -> void:
         var fear: float = max(distance_factor, stalker.get_awareness() * 0.85)
         if stalker.get_state_name() == "CHASE":
             fear = max(fear, 0.8)
-        post_process.set_fear_level(fear)
-        if hud != null:
-            hud.set_danger_level(fear)
         player.set_stress_level(fear)
+        # SANITY: düşük akıl görsel bozulmayı artırır (plan: HUD/karanlık bozulur)
+        var insane: float = 1.0 - player.get_sanity()
+        post_process.set_fear_level(max(fear, insane * 0.55))
+        if hud != null:
+            hud.set_danger_level(max(fear, insane * 0.5))
+        _update_scare_director(delta, fear)
+
+func _update_scare_director(delta: float, fear: float) -> void:
+    # Oyuncu uzun süre sakinse kontrollü korku olayı tetikle (jumpscare spam yok).
+    # Akıl düştükçe olaylar daha sık (eşik kısalır).
+    if light_manager == null:
+        return
+    if fear < 0.25:
+        _calm_time += delta
+    else:
+        _calm_time = 0.0
+    _scare_cooldown = max(0.0, _scare_cooldown - delta)
+    var threshold: float = lerp(13.0, 26.0, player.get_sanity())
+    if _calm_time > threshold and _scare_cooldown <= 0.0:
+        _trigger_scare()
+        _calm_time = 0.0
+        _scare_cooldown = randf_range(16.0, 30.0)
+
+func _trigger_scare() -> void:
+    var roll: float = randf()
+    if roll < 0.5:
+        light_manager.trigger_blackout(randf_range(0.5, 1.2))               # ışıklar kısa söner
+    else:
+        var off: Vector3 = Vector3(randf_range(-12.0, 12.0), 0.0, randf_range(-12.0, 12.0))
+        light_manager.trigger_disturbance(player.global_position + off, 2.4, 1.0)  # uzakta titreme
 
 func _apply_premium_runtime_settings() -> void:
     # Render ayarları project.godot'ta tutulur (runtime'da yazmak debugger'ı kirletir / no-op'tur).
