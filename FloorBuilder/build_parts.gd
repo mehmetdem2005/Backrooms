@@ -8,30 +8,30 @@ func _init() -> void:
     mat.normal_enabled = true
     mat.normal_texture = load("res://textures/floor_normal.png")
     mat.roughness = 1.0
-    var bm := BoxMesh.new()
-    bm.size = Vector3(4, 0.12, 4)
-    bm.material = mat
-    var ml := MeshLibrary.new()
-    ml.create_item(0)
-    ml.set_item_name(0, "Floor")
-    ml.set_item_mesh(0, bm)
-    ml.set_item_mesh_transform(0, Transform3D(Basis(), Vector3(0, -0.06, 0)))
-    var shp := BoxShape3D.new()
-    shp.size = Vector3(4, 0.12, 4)
-    ml.set_item_shapes(0, [shp, Transform3D(Basis(), Vector3(0, -0.06, 0))])
-    ResourceSaver.save(ml, "res://floor.meshlib.tres")
+    ResourceSaver.save(mat, "res://floor_material.tres")
 
-    var root := Node3D.new(); root.name = "Map"
-    var gm := GridMap.new(); gm.name = "GridMap"
-    gm.mesh_library = ml
-    gm.cell_size = Vector3(4, 2, 4)
-    gm.cell_center_y = false
-    root.add_child(gm); gm.owner = root
-    for x in range(0, 8):
-        for z in range(0, 8):
-            gm.set_cell_item(Vector3i(x, 0, z), 0)
+    # --- FloorTile.tscn : tek zemin parçası (PlaneMesh 4x4) ---
+    var tile := MeshInstance3D.new()
+    tile.name = "FloorTile"
+    var pm := PlaneMesh.new()
+    pm.size = Vector2(4, 4)
+    tile.mesh = pm
+    tile.set_surface_override_material(0, mat)
+    var ts := PackedScene.new()
+    ts.pack(tile)
+    ResourceSaver.save(ts, "res://FloorTile.tscn")
+
+    # --- Level.tscn : haritayı dizeceğin sahne (demo 4x4 + kamera + ışık) ---
+    var root := Node3D.new(); root.name = "Level"
+    var holder := Node3D.new(); holder.name = "Floors"
+    root.add_child(holder); holder.owner = root
+    for x in range(4):
+        for z in range(4):
+            var inst := ts.instantiate()
+            inst.position = Vector3(x * 4, 0, z * 4)
+            holder.add_child(inst); inst.owner = root
     var cam := Camera3D.new(); cam.name = "Camera3D"
-    cam.transform = Transform3D(Basis(), Vector3(16, 22, 36)).looking_at(Vector3(16, 0, 14), Vector3.UP)
+    cam.transform = Transform3D(Basis(), Vector3(6, 17, 28)).looking_at(Vector3(6, 0, 6), Vector3.UP)
     root.add_child(cam); cam.owner = root
     var sun := DirectionalLight3D.new(); sun.name = "Sun"
     sun.rotation = Vector3(deg_to_rad(-55), deg_to_rad(35), 0)
@@ -47,8 +47,8 @@ func _init() -> void:
     env.tonemap_mode = Environment.TONE_MAPPER_AGX
     we.environment = env
     root.add_child(we); we.owner = root
-    var ps := PackedScene.new()
-    ps.pack(root)
-    ResourceSaver.save(ps, "res://Map.tscn")
-    print("KIT_BUILT meshlib+map ok")
+    var ls := PackedScene.new()
+    ls.pack(root)
+    ResourceSaver.save(ls, "res://Level.tscn")
+    print("PARTS_BUILT ok")
     quit()

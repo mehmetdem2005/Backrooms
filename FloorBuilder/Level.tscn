@@ -1,0 +1,117 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://textures/floor_albedo.png" id="1_wkftn"]
+[ext_resource type="Texture2D" path="res://textures/floor_ao.png" id="2_q4iis"]
+[ext_resource type="Texture2D" path="res://textures/floor_normal.png" id="3_m3clv"]
+[ext_resource type="Texture2D" path="res://textures/floor_rough.png" id="4_mxnmf"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_edwd6"]
+size = Vector2(4, 4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5wgok"]
+albedo_texture = ExtResource("1_wkftn")
+roughness_texture = ExtResource("4_mxnmf")
+normal_enabled = true
+normal_texture = ExtResource("3_m3clv")
+ao_enabled = true
+ao_texture = ExtResource("2_q4iis")
+
+[sub_resource type="Environment" id="Environment_4eo0i"]
+background_mode = 1
+background_color = Color(0.1, 0.11, 0.13, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.92, 0.93, 0.95, 1)
+tonemap_mode = 4
+
+[node name="Level" type="Node3D" unique_id=1589881031]
+
+[node name="Floors" type="Node3D" parent="." unique_id=1090448567]
+
+[node name="FloorTile" type="MeshInstance3D" parent="Floors" unique_id=612339827]
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@2" type="MeshInstance3D" parent="Floors" unique_id=953599214]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@3" type="MeshInstance3D" parent="Floors" unique_id=723432652]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@4" type="MeshInstance3D" parent="Floors" unique_id=1830559391]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 12)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@5" type="MeshInstance3D" parent="Floors" unique_id=819323309]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@6" type="MeshInstance3D" parent="Floors" unique_id=693110062]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@7" type="MeshInstance3D" parent="Floors" unique_id=644303221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 8)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@8" type="MeshInstance3D" parent="Floors" unique_id=1290763777]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 12)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@9" type="MeshInstance3D" parent="Floors" unique_id=1139701631]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@10" type="MeshInstance3D" parent="Floors" unique_id=1283960898]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 4)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@11" type="MeshInstance3D" parent="Floors" unique_id=586732516]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 8)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@12" type="MeshInstance3D" parent="Floors" unique_id=165433744]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 12)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@13" type="MeshInstance3D" parent="Floors" unique_id=1442161825]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 0)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@14" type="MeshInstance3D" parent="Floors" unique_id=2040015277]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 4)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@15" type="MeshInstance3D" parent="Floors" unique_id=628271709]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 8)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="@MeshInstance3D@16" type="MeshInstance3D" parent="Floors" unique_id=1112453886]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 12)
+mesh = SubResource("PlaneMesh_edwd6")
+surface_material_override/0 = SubResource("StandardMaterial3D_5wgok")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1232050804]
+transform = Transform3D(1, 0, 0, 0, 0.791285, 0.6114475, 0, -0.6114475, 0.791285, 6, 17, 28)
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=822753608]
+transform = Transform3D(0.81915206, -0.46984634, 0.32898995, 0, 0.57357645, 0.81915206, -0.57357645, -0.6710101, 0.46984634, 0, 0, 0)
+light_energy = 0.8
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=949182967]
+environment = SubResource("Environment_4eo0i")
