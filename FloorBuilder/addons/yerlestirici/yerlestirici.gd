@@ -1,8 +1,7 @@
 @tool
 extends EditorPlugin
-## Parça Yerleştirici (dokunmatik dostu):
-## Panelden bir mod seç (parça = KOY, ya da SİL), sonra sahnede DOKUN.
-## Her işlem buton — sağ tık yok. Izgara: 4 m hizalı.
+## Parça Yerleştirici (dokunmatik): butonlar 3B görünümün ÜST araç çubuğunda.
+## Bir mod seç (parça=KOY, ya da SİL), sonra sahnede DOKUN. Izgara: 4 m.
 
 const IZGARA: float = 4.0
 
@@ -11,78 +10,53 @@ var parcalar: Dictionary = {
 	"Zemin": "res://parts/Zemin.tscn",
 }
 
-var panel: VBoxContainer
+var arac: HBoxContainer
 var durum: Label
 var mod: String = "yok"          # "yok" | "koy" | "sil"
 var secili_ad: String = ""
 var secili_yol: String = ""
-var butonlar: Array = []          # tüm mod butonları (radyo gibi)
+var butonlar: Array = []
 
 func _enter_tree() -> void:
-	panel = VBoxContainer.new()
-	panel.name = "Yerleştirici"
-	panel.custom_minimum_size = Vector2(210, 0)
+	arac = HBoxContainer.new()
+	arac.add_theme_constant_override("separation", 6)
 
 	var baslik: Label = Label.new()
-	baslik.text = "🧩  PARÇA YERLEŞTİRİCİ"
-	panel.add_child(baslik)
-
-	var ipucu: Label = Label.new()
-	ipucu.text = "Bir mod seç, sonra sahnede DOKUN."
-	ipucu.modulate = Color(0.75, 0.8, 0.85)
-	ipucu.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ipucu.custom_minimum_size = Vector2(200, 0)
-	panel.add_child(ipucu)
-
-	panel.add_child(HSeparator.new())
-
-	var l1: Label = Label.new()
-	l1.text = "PARÇALAR (dokun = koy)"
-	l1.modulate = Color(0.7, 0.9, 0.7)
-	panel.add_child(l1)
+	baslik.text = "🧩 Yerleştir:"
+	arac.add_child(baslik)
 
 	for ad: String in parcalar.keys():
 		var b: Button = Button.new()
-		b.text = "▸  " + ad
+		b.text = ad
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(0, 38)
 		b.pressed.connect(_parca_modu.bind(ad, b))
-		panel.add_child(b)
+		arac.add_child(b)
 		butonlar.append(b)
 
-	panel.add_child(HSeparator.new())
-
 	var sil_btn: Button = Button.new()
-	sil_btn.text = "🗑  SİL  (dokun = sil)"
+	sil_btn.text = "🗑 Sil"
 	sil_btn.toggle_mode = true
-	sil_btn.custom_minimum_size = Vector2(0, 38)
-	sil_btn.modulate = Color(1.0, 0.7, 0.7)
 	sil_btn.pressed.connect(_sil_modu.bind(sil_btn))
-	panel.add_child(sil_btn)
+	arac.add_child(sil_btn)
 	butonlar.append(sil_btn)
 
 	var dur_btn: Button = Button.new()
-	dur_btn.text = "✋  DURDUR"
-	dur_btn.custom_minimum_size = Vector2(0, 38)
+	dur_btn.text = "✋ Dur"
 	dur_btn.pressed.connect(_durdur)
-	panel.add_child(dur_btn)
-
-	panel.add_child(HSeparator.new())
+	arac.add_child(dur_btn)
 
 	durum = Label.new()
-	durum.text = "Mod: yok"
-	durum.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	durum.custom_minimum_size = Vector2(200, 0)
+	durum.text = "  (mod: yok)"
 	durum.modulate = Color(0.6, 0.85, 1.0)
-	panel.add_child(durum)
+	arac.add_child(durum)
 
-	add_control_to_dock(DOCK_SLOT_RIGHT_UL, panel)
+	add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, arac)
 
 func _exit_tree() -> void:
-	if panel:
-		remove_control_from_docks(panel)
-		panel.queue_free()
-		panel = null
+	if arac:
+		remove_control_from_container(CONTAINER_SPATIAL_EDITOR_MENU, arac)
+		arac.queue_free()
+		arac = null
 
 func _butonlari_ayarla(aktif: Button) -> void:
 	for b: Button in butonlar:
@@ -93,17 +67,17 @@ func _parca_modu(ad: String, btn: Button) -> void:
 	secili_ad = ad
 	secili_yol = parcalar[ad]
 	_butonlari_ayarla(btn)
-	durum.text = "Mod: KOY → %s\nSahnede dokun, yerleşir." % ad
+	durum.text = "  → KOY: %s (sahnede dokun)" % ad
 
 func _sil_modu(btn: Button) -> void:
 	mod = "sil"
 	_butonlari_ayarla(btn)
-	durum.text = "Mod: SİL\nSahnede bir parçaya dokun, silinir."
+	durum.text = "  → SİL (parçaya dokun)"
 
 func _durdur() -> void:
 	mod = "yok"
 	_butonlari_ayarla(null)
-	durum.text = "Mod: yok (dokunma kapalı)"
+	durum.text = "  (mod: yok)"
 
 func _handles(_object: Object) -> bool:
 	return mod != "yok"
@@ -145,7 +119,7 @@ func _hucre_merkez(nokta: Vector3) -> Vector3:
 func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	var kok: Node = EditorInterface.get_edited_scene_root()
 	if kok == null:
-		durum.text = "Önce bir sahne aç (Harita.tscn)."
+		durum.text = "  Önce sahne aç (Harita.tscn)"
 		return
 	var carpma = _zemin_noktasi(kamera, ekran)
 	if carpma == null:
