@@ -267,7 +267,20 @@ func _update_state_logic(delta: float) -> void:
             _request_path_to(pcell)
         return
 
+    # PUSU: hedef köşeye varınca veya süre dolunca kovalamaya dön
+    if _current_state == "AMBUSH":
+        if _path.is_empty() or _arrived_to_cell(_target_cell) or _state_timer > 4.5:
+            _ambush_cooldown = _rng.randf_range(13.0, 20.0)
+            _set_state("CHASE")
+        return
+
     if _awareness > 0.30:
+        # Ara sıra doğrudan kovalamak yerine köşeden KESME (pusu)
+        if _ambush_cooldown <= 0.0 and global_position.distance_to(player.global_position) > 16.0:
+            _target_cell = level_builder.get_ambush_cell_around(_predicted_player_cell(), _rng)
+            _set_state("AMBUSH")
+            _request_path_to(_target_cell)
+            return
         _set_state("CHASE")
         if _repath_timer <= 0.0 or _path.is_empty():
             _repath_timer = repath_interval
