@@ -554,8 +554,10 @@ func _first_room_on(f: int) -> Rect2i:
 # ---------------------------------------------------------------- geometri
 
 func _ramp_footprint() -> Dictionary:
-    # "f:x:z" -> true  (üst kat zeminini ve alt kat tavanını delmek için)
-    var set: Dictionary = {}
+    # Üst kat ZEMİNİ delinir (rampa onun yerine geçer). Alt kat TAVANI delinir
+    # (rampa şaftı açılır) ama alt kat ZEMİNİ KORUNUR (temiz iniş zemini).
+    var floor_set: Dictionary = {}
+    var ceil_set: Dictionary = {}
     for r: Dictionary in _ramps:
         var f: int = int(r["floor"])
         var x: int = int(r["x"])
@@ -564,14 +566,17 @@ func _ramp_footprint() -> Dictionary:
         for i: int in range(0, RAMP_RUN + 1):
             var cx: int = x + dir.x * i
             var cz: int = z + dir.y * i
-            set["%d:%d:%d" % [f, cx, cz]] = true            # üst kat zemini delinir
-            set["%d:%d:%d" % [f + 1, cx, cz]] = true        # alt kat tavanı delinir
-    return set
+            floor_set["%d:%d:%d" % [f, cx, cz]] = true       # üst kat zemini sil
+            ceil_set["%d:%d:%d" % [f, cx, cz]] = true         # üst kat tavanı sil (şaft yukarı açık)
+            ceil_set["%d:%d:%d" % [f + 1, cx, cz]] = true     # alt kat tavanı sil
+    return {"floor": floor_set, "ceil": ceil_set}
 
 func _build_geometry() -> void:
     fixture_positions.clear()
     chunks.clear()
-    var holes: Dictionary = _ramp_footprint()
+    var ramp_fp: Dictionary = _ramp_footprint()
+    var floor_holes: Dictionary = ramp_fp["floor"]
+    var ceil_holes: Dictionary = ramp_fp["ceil"]
     var buckets: Dictionary = {}
 
     for f: int in range(floors):
@@ -584,12 +589,12 @@ func _build_geometry() -> void:
                 var key: String = "%d:%d:%d" % [f, x, z]
                 if _get_cell(f, x, z) == 0:
                     var is_water: bool = _water_cells.has(key)
-                    if not holes.has(key):
+                    if not floor_holes.has(key):
                         # Havuz hücreleri beyaz fayans, diğerleri halı
                         var floor_type: String = "pooltile" if is_water else "floor"
                         _bpush(bucket, floor_type, _scaled_transform(Vector3(cell_size, 0.10, cell_size), center + Vector3(0.0, -0.05, 0.0)))
-                    # Tavan (sadece üstünde başka kat yoksa tam tavan; rampa deliği hariç)
-                    if not holes.has(key):
+                    # Tavan (rampa şaftında delik)
+                    if not ceil_holes.has(key):
                         _bpush(bucket, "ceiling", _scaled_transform(Vector3(cell_size, 0.12, cell_size), center + Vector3(0.0, ceiling_height, 0.0)))
                         var grid_y: float = ceiling_height - 0.07
                         _bpush(bucket, "grid", _scaled_transform(Vector3(cell_size, 0.05, 0.07), center + Vector3(0.0, grid_y, 0.0)))
@@ -776,12 +781,17 @@ func _build_chunk(key: Vector3i, bucket: Dictionary) -> void:
     body.name = "ChunkCollision"
     chunk.add_child(body)
 
-    var floor_shape: BoxShape3D = BoxShape3D.new()
-    floor_shape.size = Vector3(span_x, 0.22, span_z)
-    var floor_col: CollisionShape3D = CollisionShape3D.new()
-    floor_col.shape = floor_shape
-    floor_col.position = center_world + Vector3(0.0, -0.12, 0.0)
-    body.add_child(floor_col)
+    # Zemin çarpışması HÜCRE BAŞINA (floor + pooltile mesh'leriyle birebir).
+    # Tek dev kutu rampa deliğini de kapatıyordu → aşağı inilemiyordu. Artık delik gerçek.
+    for ftype: String in ["floor", "pooltile"]:
+        if bucket.has(ftype):
+            for xform: Transform3D in bucket[ftype]:
+                var fs: BoxShape3D = BoxShape3D.new()
+                fs.size = Vector3(cell_size, 0.22, cell_size)
+                var fcol: CollisionShape3D = CollisionShape3D.new()
+                fcol.shape = fs
+                fcol.position = xform.origin
+                body.add_child(fcol)
 
     if bucket.has("_walls"):
         for wc: Vector3 in bucket["_walls"]:

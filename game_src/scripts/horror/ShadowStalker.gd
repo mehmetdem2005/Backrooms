@@ -311,9 +311,18 @@ func _request_path_to(goal: Vector3i) -> void:
     _path = level_builder.get_grid_path(start, goal, 4000)
     _path_index = 0
 
+func _apply_gravity(delta: float) -> void:
+    # Gerçek yerçekimi → canavar da rampadan inebilir, havada kalmaz.
+    if is_on_floor():
+        velocity.y = -2.0
+    else:
+        velocity.y = max(velocity.y - 20.0 * delta, -32.0)
+
 func _follow_path(delta: float) -> void:
     if _path.is_empty() or _path_index >= _path.size():
-        velocity = velocity.move_toward(Vector3.ZERO, 7.0 * delta)
+        velocity.x = move_toward(velocity.x, 0.0, 7.0 * delta)
+        velocity.z = move_toward(velocity.z, 0.0, 7.0 * delta)
+        _apply_gravity(delta)
         move_and_slide()
         _current_speed = Vector2(velocity.x, velocity.z).length()
         return
@@ -332,7 +341,9 @@ func _follow_path(delta: float) -> void:
     if flat_to_target.length() < 0.5:
         _path_index += 1
         if _path_index >= _path.size():
-            velocity = velocity.move_toward(Vector3.ZERO, 7.0 * delta)
+            velocity.x = move_toward(velocity.x, 0.0, 7.0 * delta)
+            velocity.z = move_toward(velocity.z, 0.0, 7.0 * delta)
+            _apply_gravity(delta)
             move_and_slide()
             _current_speed = Vector2(velocity.x, velocity.z).length()
             return
@@ -351,7 +362,7 @@ func _follow_path(delta: float) -> void:
     var desired: Vector3 = flat_to_target.normalized() * spd
     velocity.x = move_toward(velocity.x, desired.x, 12.0 * delta)
     velocity.z = move_toward(velocity.z, desired.z, 12.0 * delta)
-    velocity.y = -0.2
+    _apply_gravity(delta)
     move_and_slide()
     _current_speed = Vector2(velocity.x, velocity.z).length()
     # Yön: model _update_visual'da daima oyuncuya bakar.

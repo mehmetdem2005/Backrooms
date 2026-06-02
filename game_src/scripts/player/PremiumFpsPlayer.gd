@@ -384,7 +384,11 @@ func _update_movement(delta: float) -> void:
     var desired: Vector3 = (right * input_vector.x + forward * input_vector.y) * target_speed
     velocity.x = move_toward(velocity.x, desired.x, acceleration * delta)
     velocity.z = move_toward(velocity.z, desired.z, acceleration * delta)
-    velocity.y = -0.2
+    # GERÇEK yerçekimi: zeminde hafif yapışma, havadayken düşüş → rampa/merdivenden inebilme
+    if is_on_floor():
+        velocity.y = -2.0
+    else:
+        velocity.y = max(velocity.y - 20.0 * delta, -32.0)
     move_and_slide()
 
 func _get_desktop_move_vector() -> Vector2:
