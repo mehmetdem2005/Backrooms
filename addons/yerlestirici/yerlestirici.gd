@@ -11,6 +11,7 @@ extends EditorPlugin
 ## • HIZLI KURMA: sürükle = seri, R = 90° döndür, [ ] = yükseklik, snap aç/kapa.
 ## • HARİTA YÖNETİMİ: grup (oda/kat) altına toplama, grubu/tümünü temizle, sayaç, undo.
 
+const HATA_AYIKLA := true   # teşhis çıktıları (Output panelinde [YP] satırları)
 const IZGARA: float = 4.0
 const PARCA_KLASORU := "res://parts/"
 const GRUP_META := "parca_grubu"
@@ -157,6 +158,11 @@ func _handles(_o: Object) -> bool:
 	return _panel != null
 
 func _forward_3d_gui_input(kamera: Camera3D, olay: InputEvent) -> int:
+	# TEŞHİS: fare/dokunma basışı geldiğinde, mod ne olursa olsun bir kez bildir.
+	if HATA_AYIKLA and ((olay is InputEventMouseButton and olay.button_index == MOUSE_BUTTON_LEFT and olay.pressed) \
+			or (olay is InputEventScreenTouch and olay.pressed)):
+		print("[YP] forward: basış alındı | panel=%s mod=%s secili=%s" % [
+			str(_panel != null), (_panel.mod if _panel else "-"), (_panel.secili_ad if _panel else "-")])
 	if _panel == null or _panel.mod == "yok":
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
 
@@ -223,14 +229,18 @@ func _zemin_noktasi(kamera: Camera3D, ekran: Vector2):
 func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	var kok: Node = EditorInterface.get_edited_scene_root()
 	if kok == null:
+		if HATA_AYIKLA: print("[YP] yerleştir: SAHNE AÇIK DEĞİL")
 		_panel.durum_yaz("Önce sahneyi aç (Harita.tscn)")
 		return
 	if _panel.secili_ad == "" or not parcalar.has(_panel.secili_ad):
+		if HATA_AYIKLA: print("[YP] yerleştir: PARÇA SEÇİLİ DEĞİL (secili='%s')" % _panel.secili_ad)
 		_panel.durum_yaz("Önce bir parça seç")
 		return
 	var carpma = _zemin_noktasi(kamera, ekran)
 	if carpma == null:
+		if HATA_AYIKLA: print("[YP] yerleştir: IŞIN y=0 DÜZLEMİNE DEĞMEDİ (kamera açısı). ekran=%s" % str(ekran))
 		return
+	if HATA_AYIKLA: print("[YP] yerleştir: kok=%s parça=%s çarpma=%s" % [kok.name, _panel.secili_ad, str(carpma)])
 
 	var ad: String = _panel.secili_ad
 	var olc: float = maxf(_panel.olcek(), 0.01)
@@ -307,6 +317,8 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	_son_hucre = hedef
 	_son_secilen = ad
 	_sayaci_guncelle()
+	if HATA_AYIKLA: print("[YP] YERLEŞTİ ✓ '%s' @ %s  (grup='%s', toplam=%d)" % [
+		tip_ad, str(hedef), grup.name, _tum_parcalar(kok).size()])
 
 # ---------------------------------------------------------------- Silme
 func _sil(kamera: Camera3D, ekran: Vector2) -> void:
