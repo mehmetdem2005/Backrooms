@@ -130,7 +130,7 @@ func _surukle(kamera: Camera3D, ekran: Vector2) -> void:
 		return
 	if not _yuzey_uygun(v.normal):
 		return
-	_leke_bas(kok, v.nokta, v.normal)
+	_leke_bas(kok, v.nokta, v.normal, v.dugum)
 	_son_pos = v.nokta
 	_gecerli_pos = true
 
@@ -145,12 +145,12 @@ func _boya(kamera: Camera3D, ekran: Vector2) -> void:
 	if not _yuzey_uygun(v.normal):
 		_panel._durum.text = "Bu yüzey filtreye uymuyor (Yüzey: %s)" % _panel.yuzey_filtre
 		return
-	_leke_bas(kok, v.nokta, v.normal)
+	_leke_bas(kok, v.nokta, v.normal, v.dugum)
 	_son_pos = v.nokta
 	_gecerli_pos = true
 
 ## Tek tıkta saçılma adedince leke üretir, hepsini tek undo işleminde ekler.
-func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3) -> void:
+func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3, dugum: Node) -> void:
 	var kapsayici := _kapsayici_bul_olustur(kok)
 	var n := normal.normalized()
 	if n.length() < 0.5:
@@ -159,6 +159,11 @@ func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 	var yardim := Vector3.UP if absf(n.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
 	var teg_x := yardim.cross(n).normalized()
 	var teg_y := n.cross(teg_x).normalized()
+
+	# Lekenin yüzeyden taşmaması için izin verilen azami yarı-boyut (dünya birimi).
+	var azami_yari := INF
+	if _panel.yuzeye_sigdir and dugum is MeshInstance3D:
+		azami_yari = _yuzey_sinir(dugum as MeshInstance3D, nokta, n)
 
 	var stickerlar: Array[MeshInstance3D] = []
 	var adet := maxi(_panel.saci_sayi, 1)
@@ -171,7 +176,7 @@ func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 		var yol := _panel.rastgele_yol()
 		if yol == "":
 			continue
-		var s := _sticker_olustur(yol, merkez, n, teg_x, teg_y, i)
+		var s := _sticker_olustur(yol, merkez, n, teg_x, teg_y, i, azami_yari)
 		if s != null:
 			stickerlar.append(s)
 	if stickerlar.is_empty():
@@ -187,11 +192,16 @@ func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 	ur.commit_action()
 	_panel._durum.text = "Leke basıldı (%d). Yüzey: %s" % [stickerlar.size(), _panel.yuzey_filtre]
 
-func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, teg_y: Vector3, indeks: int) -> MeshInstance3D:
+func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, teg_y: Vector3, indeks: int, azami_yari: float = INF) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = "Leke"
 	var q := QuadMesh.new()
 	var s := randf_range(_panel.boyut_min, _panel.boyut_max)
+	# Yüzeyden taşmasın: kare köşeleri de sığsın diye yarı-köşegen (s*0.5*√2)
+	# azami sınırı geçmemeli -> s <= azami_yari * 2 / √2.
+	if azami_yari < INF:
+		var ust := maxf(azami_yari * 1.41421, 0.04)
+		s = minf(s, ust)
 	q.size = Vector2(s, s)
 	mi.mesh = q
 
@@ -232,6 +242,30 @@ func _yuzey_uygun(normal: Vector3) -> bool:
 		"tavan": return ny < -0.6
 		"duvar": return absf(ny) <= 0.6
 		_: return true
+
+## Çarpılan yüzeyin kenarına dünya-uzayında en kısa mesafe. Leke bunu aşmaz
+## (taşmayı önler). Mesh AABB'sinin, yüzey normaline dik iki ekseni kullanılır.
+func _yuzey_sinir(mi: MeshInstance3D, dunya_nokta: Vector3, dunya_n: Vector3) -> float:
+	if mi.mesh == null:
+		return INF
+	var gt := mi.global_transform
+	var yp := gt.affine_inverse() * dunya_nokta
+	var aabb := mi.mesh.get_aabb()
+	var merkez := aabb.position + aabb.size * 0.5
+	var yari := aabb.size * 0.5
+	var ln := (gt.basis.inverse().transposed() * dunya_n).normalized()
+	var olcek := gt.basis.get_scale()
+	var ax := absf(ln.x)
+	var ay := absf(ln.y)
+	var az := absf(ln.z)
+	var d := INF
+	if ax >= ay and ax >= az:
+		d = minf((yari.y - absf(yp.y - merkez.y)) * olcek.y, (yari.z - absf(yp.z - merkez.z)) * olcek.z)
+	elif ay >= ax and ay >= az:
+		d = minf((yari.x - absf(yp.x - merkez.x)) * olcek.x, (yari.z - absf(yp.z - merkez.z)) * olcek.z)
+	else:
+		d = minf((yari.x - absf(yp.x - merkez.x)) * olcek.x, (yari.y - absf(yp.y - merkez.y)) * olcek.y)
+	return maxf(d, 0.02)
 
 func _kapsayici_bul_olustur(kok: Node) -> Node3D:
 	for c in kok.get_children():

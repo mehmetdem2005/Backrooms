@@ -10,14 +10,15 @@ signal onbellek_temizle_istendi()
 # --- Durum (eklenti bunları okur) ---
 var mod: String = "yok"                       # "yok" | "boya" | "sil"
 var aktif_yollar: Array[String] = []          # rotasyondaki seçili leke yolları
-var boyut_min: float = 0.8
-var boyut_max: float = 1.8
-var opaklik_min: float = 0.55
-var opaklik_max: float = 0.9
+var boyut_min: float = 0.45
+var boyut_max: float = 1.2
+var opaklik_min: float = 0.4
+var opaklik_max: float = 0.8
 var saci_sayi: int = 1
-var saci_yaricap: float = 0.6
-var aralik: float = 0.5                        # sürükleyerek boyamada adım (m)
+var saci_yaricap: float = 0.4
+var aralik: float = 0.35                        # sürükleyerek boyamada adım (m)
 var rastgele_donme: bool = true
+var yuzeye_sigdir: bool = true                  # leke yüzey kenarından taşmasın
 var yuzey_filtre: String = "hepsi"             # hepsi|zemin|duvar|tavan
 var renk: Color = Color(1, 1, 1)               # tint (dokuyu çarpar)
 var esik: float = 0.05
@@ -133,15 +134,16 @@ func _arayuz_olustur() -> void:
 	palet_baslik.add_child(hic_btn)
 
 	var izgara := GridContainer.new()
-	izgara.columns = 4
+	izgara.columns = 3
 	add_child(izgara)
 	for yol in _kutuphane.yollar:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.button_pressed = true
-		b.custom_minimum_size = Vector2(56, 56)
+		b.custom_minimum_size = Vector2(92, 92)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.expand_icon = true
-		var tex := _kutuphane.onizleme(yol, 96)
+		var tex := _kutuphane.onizleme(yol, 160)
 		if tex != null:
 			b.icon = tex
 		b.tooltip_text = yol.get_file()
@@ -200,6 +202,12 @@ func _arayuz_olustur() -> void:
 	donme_chk.button_pressed = rastgele_donme
 	donme_chk.toggled.connect(func(v): rastgele_donme = v)
 	add_child(donme_chk)
+
+	var sigdir_chk := CheckBox.new()
+	sigdir_chk.text = "Yüzeye sığdır (taşmasın)"
+	sigdir_chk.button_pressed = yuzeye_sigdir
+	sigdir_chk.toggled.connect(func(v): yuzeye_sigdir = v)
+	add_child(sigdir_chk)
 
 	_islak_chk = CheckBox.new()
 	_islak_chk.text = "Islak / parlak görünüm"
