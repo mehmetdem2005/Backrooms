@@ -1,0 +1,20 @@
+; Backrooms Floor Builder - temiz proje (sadece kullanıcının verdiği zemin)
+config_version=5
+
+[application]
+config/name="Backrooms Floor Builder"
+run/main_scene="res://scenes/Builder.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/handheld/orientation=1
+
+[input_devices]
+pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=true
+
+[rendering]
+textures/canvas_textures/default_texture_filter=1
+anti_aliasing/quality/msaa_3d=1
