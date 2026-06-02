@@ -61,6 +61,22 @@ func _arac_kur() -> void:
 func _mod_tikla(m: String) -> void:
 	if _panel:
 		_panel.mod_ayarla(m)
+		if m != "yok":
+			_editoru_aktiflestir()
+
+func _parca_secildi(ad: String) -> void:
+	_son_secilen = ad
+	_editoru_aktiflestir()
+
+# Parça seçince / mod açınca 3B viewport'u aktif eder ve eklentiyi aktif handler
+# yapar. Böylece dock'tan seçtikten sonra İLK viewport tıklaması yerleştirir
+# (yoksa ilk tık yalnızca odağı/handler'ı değiştirir, parça konmaz).
+func _editoru_aktiflestir() -> void:
+	var kok: Node = EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	EditorInterface.set_main_screen_editor("3D")
+	EditorInterface.edit_node(kok)
 
 func _arac_guncelle(m: String) -> void:
 	if _btn_koy:
@@ -78,7 +94,7 @@ func _paneli_kur() -> void:
 	_panel.grubu_temizle_istendi.connect(_grubu_temizle)
 	_panel.tumunu_temizle_istendi.connect(_tumunu_temizle)
 	_panel.son_parca_istendi.connect(_son_parcayi_sec)
-	_panel.parca_secildi.connect(func(ad): _son_secilen = ad)
+	_panel.parca_secildi.connect(_parca_secildi)
 	_panel.mod_degisti.connect(_arac_guncelle)
 	_dock = ScrollContainer.new()
 	_dock.name = "Yerleştirici"
