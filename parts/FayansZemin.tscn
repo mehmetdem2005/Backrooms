@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://textures/gray_tile_wall_clean_albedo.png" id="1_alb"]
+[ext_resource type="Texture2D" path="res://textures/gray_tile_wall_clean_ao.png" id="2_ao"]
+[ext_resource type="Texture2D" path="res://textures/gray_tile_wall_clean_normal.png" id="3_nrm"]
+[ext_resource type="Texture2D" path="res://textures/gray_tile_wall_clean_roughness.png" id="4_rgh"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_fz"]
+size = Vector3(4, 0.12, 4)
+
+[sub_resource type="StandardMaterial3D" id="Mat_fz"]
+albedo_texture = ExtResource("1_alb")
+roughness_texture = ExtResource("4_rgh")
+normal_enabled = true
+normal_texture = ExtResource("3_nrm")
+ao_enabled = true
+ao_texture = ExtResource("2_ao")
+
+[node name="FayansZemin" type="MeshInstance3D"]
+mesh = SubResource("BoxMesh_fz")
+surface_material_override/0 = SubResource("Mat_fz")

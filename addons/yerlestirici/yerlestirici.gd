@@ -10,7 +10,10 @@ const IZGARA: float = 4.0
 var parcalar: Dictionary = {
 	"Zemin": {"yol": "res://parts/Zemin.tscn", "ikon": "res://textures/floor_albedo.png", "eksen": "y", "kal": 0.12},
 	"Gri Zemin": {"yol": "res://parts/GriZemin.tscn", "ikon": "res://textures/gray_tile_wall_01_albedo.png", "eksen": "y", "kal": 0.12},
+	"Fayans Zemin": {"yol": "res://parts/FayansZemin.tscn", "ikon": "res://textures/gray_tile_wall_clean_albedo.png", "eksen": "y", "kal": 0.12},
 	"Duvar": {"yol": "res://parts/Duvar.tscn", "ikon": "res://textures/gray_tile_wall_clean_albedo.png", "eksen": "z", "kal": 0.2},
+	"Kirli Duvar": {"yol": "res://parts/KirliDuvar.tscn", "ikon": "res://textures/gray_tile_wall_01_albedo.png", "eksen": "z", "kal": 0.2},
+	"Tavan": {"yol": "res://parts/Tavan.tscn", "ikon": "res://textures/floor_albedo.png", "eksen": "y", "kal": 0.12, "yuk": 3.0},
 }
 
 var arac: HBoxContainer
@@ -60,6 +63,7 @@ func _enter_tree() -> void:
 		var ay: YerlestirmeAyari = YerlestirmeAyari.new()
 		ay.resource_name = ad + " Ayarları"
 		ay.kalinlik = parcalar[ad].get("kal", 0.2)
+		ay.yukseklik = parcalar[ad].get("yuk", 0.0)
 		ayarlar[ad] = ay
 
 	var sil_btn: Button = Button.new()
