@@ -12,6 +12,7 @@ const AUDIO_DIRECTOR_SCRIPT: Script = preload("res://scripts/horror/AudioDirecto
 const JUMPSCARE_SCRIPT: Script = preload("res://scripts/horror/JumpscareOverlay.gd")
 const BATTERY_SCRIPT: Script = preload("res://scripts/items/BatteryPickup.gd")
 const FAKE_EXIT_SCRIPT: Script = preload("res://scripts/items/FakeExit.gd")
+const SETTINGS_SCRIPT: Script = preload("res://scripts/ui/SettingsMenu.gd")
 
 @export var world_seed: int = 463063
 @export var maze_width: int = 33
@@ -47,9 +48,16 @@ func _ready() -> void:
     _create_atmosphere_particles()
     _create_ui()
     _create_items()
+    _create_settings()
     _create_stalker()
     _create_audio_director()
     _connect_exit()
+
+func _create_settings() -> void:
+    var settings: CanvasLayer = SETTINGS_SCRIPT.new()
+    settings.name = "SettingsMenu"
+    settings.mobile_controls = mobile_controls
+    add_child(settings)
 
 func _create_items() -> void:
     if level_builder == null:

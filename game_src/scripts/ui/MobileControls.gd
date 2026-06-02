@@ -7,6 +7,7 @@ var crouch_pressed: bool = false
 
 var _look_delta: Vector2 = Vector2.ZERO
 var _flashlight_toggle_requested: bool = false
+var _settings_requested: bool = false
 var _left_touch_index: int = -1
 var _right_touch_index: int = -1
 var _run_touch_index: int = -1
@@ -25,7 +26,9 @@ var _crouch_button: Button
 const FL_CENTER := Vector2(1790.0, 760.0)
 const RUN_CENTER := Vector2(1600.0, 905.0)
 const CR_CENTER := Vector2(1600.0, 735.0)
+const GEAR_CENTER := Vector2(1850.0, 60.0)
 const BTN_D: float = 152.0
+const GEAR_D: float = 96.0
 
 func _ready() -> void:
     layer = 30
@@ -45,6 +48,11 @@ func consume_look_delta() -> Vector2:
 func consume_flashlight_toggle() -> bool:
     var result: bool = _flashlight_toggle_requested
     _flashlight_toggle_requested = false
+    return result
+
+func consume_settings_toggle() -> bool:
+    var result: bool = _settings_requested
+    _settings_requested = false
     return result
 
 # Oyuncu her karede gerçek fener durumunu bildirir → buton "AÇ"/"KAPA" yazısı
@@ -115,6 +123,10 @@ func _build_ui() -> void:
     _crouch_button = _make_round_button("CrouchButton", "GİZLEN", CR_CENTER, BTN_D, Color(0.7, 1.0, 0.7))
     _root.add_child(_crouch_button)
 
+    var gear: Button = _make_round_button("SettingsButton", "⚙", GEAR_CENTER, GEAR_D, Color(0.8, 0.8, 0.85))
+    gear.add_theme_font_size_override("font_size", 40)
+    _root.add_child(gear)
+
 func _reset_joystick_visual() -> void:
     _stick_base.position = _joystick_center - _stick_base.size * 0.5
     _stick_knob.position = _joystick_center - _stick_knob.size * 0.5
@@ -126,6 +138,9 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
     var screen_width: float = get_viewport().get_visible_rect().size.x
     if touch.pressed:
         # 1) Aksiyon tuşları (her yerde, dokunma ile) — GUI sinyaline güvenmeyiz
+        if touch.position.distance_to(GEAR_CENTER) <= GEAR_D * 0.5 + 12.0:
+            _settings_requested = true
+            return
         if _hit(touch.position, FL_CENTER):
             _flashlight_toggle_requested = true
             return
