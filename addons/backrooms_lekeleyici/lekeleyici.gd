@@ -18,6 +18,7 @@ var _sil_arac_btn: Button
 var _basili := false
 var _son_pos := Vector3.ZERO
 var _gecerli_pos := false
+var _birim_quad: QuadMesh    # tüm lekelerin paylaştığı birim kare (perf)
 
 func _enter_tree() -> void:
 	_kutuphane = LekeKutuphane.new()
@@ -52,6 +53,21 @@ func _enter_tree() -> void:
 
 	# Panel mod değiştiğinde toolbar düğmelerini eşitle.
 	_panel.mod_degisti.connect(_arac_guncelle)
+
+	# Leke dokularını arka planda (kare kare) ön-ısıt: ilk fırçada donma olmasın.
+	_onisit_baslat()
+
+# Tüm leke dokularının alfasını, her karede bir tane üreterek önbelleğe alır.
+# Editörü bloklamaz; kullanıcı boyamaya başladığında önbellek çoğunlukla sıcaktır.
+func _onisit_baslat() -> void:
+	if _kutuphane == null or _panel == null:
+		return
+	var liste := _kutuphane.yollar.duplicate()
+	for yol in liste:
+		if _kutuphane == null:   # eklenti bu sırada kapandıysa dur
+			return
+		_kutuphane.alfa_doku(yol, _panel.esik, _panel.yumusaklik)
+		await get_tree().process_frame
 
 func _exit_tree() -> void:
 	if _arac:
@@ -199,7 +215,6 @@ func _leke_bas(kok: Node, nokta: Vector3, normal: Vector3, dugum: Node) -> void:
 func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, teg_y: Vector3, indeks: int, azami_yari: float = INF) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = "Leke"
-	var q := QuadMesh.new()
 	# min/max ters girilse bile geçerli aralık (negatif/sıfır boyut olmasın)
 	var bmin := maxf(minf(_panel.boyut_min, _panel.boyut_max), 0.05)
 	var bmax := maxf(_panel.boyut_min, _panel.boyut_max)
@@ -209,8 +224,11 @@ func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, t
 	if azami_yari < INF:
 		var ust := maxf(azami_yari * 1.8, 0.04)
 		s = minf(s, ust)
-	q.size = Vector2(s, s)
-	mi.mesh = q
+	# HIZ: her lekeye yeni mesh yerine PAYLAŞILAN birim kareyi ölçekle (transform'da).
+	if _birim_quad == null:
+		_birim_quad = QuadMesh.new()
+		_birim_quad.size = Vector2(1, 1)
+	mi.mesh = _birim_quad
 
 	var mat := StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -234,8 +252,8 @@ func _sticker_olustur(yol: String, nokta: Vector3, n: Vector3, teg_x: Vector3, t
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	# Yönelim: QuadMesh +Z'yi yüzey normaline hizala
-	var b := Basis(teg_x, teg_y, n)
+	# Yönelim: QuadMesh +Z'yi yüzey normaline hizala; birim kareyi s ile ölçekle
+	var b := Basis(teg_x * s, teg_y * s, n)
 	if _panel.rastgele_donme:
 		b = b.rotated(n, randf() * TAU)
 	# Yüzeye yapışsın: ofset birikimi yok (sıralama render_priority ile yapılır),

@@ -13,6 +13,7 @@ const VARSAYILAN_YUM := 0.12
 var yollar: Array[String] = []          # bulunan tüm leke png yolları (sıralı)
 var _alfa_onbellek: Dictionary = {}     # anahtar -> ImageTexture (alfalı)
 var _onizleme_onbellek: Dictionary = {} # yol -> ImageTexture (küçük önizleme)
+var _taban_onbellek: Dictionary = {}    # "yol|boyut" -> Image (yüklenip resize'lı; kalıcı)
 
 func _init() -> void:
 	tara()
@@ -47,68 +48,80 @@ func onizleme(yol: String, boyut: int = 96) -> Texture2D:
 	var img := _goruntu_yukle(yol)
 	if img == null:
 		return null
-	img.resize(boyut, boyut, Image.INTERPOLATE_LANCZOS)
-	img.convert(Image.FORMAT_RGBA8)
-	_alfa_uygula(img, VARSAYILAN_ESIK, VARSAYILAN_YUM)
-	var tex := ImageTexture.create_from_image(img)
+	var taban := _taban_goruntu(yol, boyut)
+	if taban == null:
+		return null
+	var tex := ImageTexture.create_from_image(_alfa_uygula(taban, VARSAYILAN_ESIK, VARSAYILAN_YUM))
 	_onizleme_onbellek[yol] = tex
 	return tex
 
-## Lekeyi ALFALI dokuya çevirir (koyu zemin -> şeffaf). Önbellekli.
-## esik: bu (normalize edilmiş) parlaklığın altı şeffaf. yumusaklik: kenar geçişi.
-func alfa_doku(yol: String, esik: float, yumusaklik: float, boyut: int = 512) -> Texture2D:
-	var anahtar := "%s|%0.3f|%0.3f|%d" % [yol, esik, yumusaklik, boyut]
-	if _alfa_onbellek.has(anahtar):
-		return _alfa_onbellek[anahtar]
+## PNG'yi yükleyip çalışma boyutuna indirir; sonucu KALICI önbelleğe alır.
+## Eşik/yumuşaklık değişince (alfa önbelleği temizlenince) bu KORUNUR, böylece
+## pahalı disk okuma + resize tekrar yapılmaz; sadece hızlı alfa döngüsü çalışır.
+func _taban_goruntu(yol: String, boyut: int) -> Image:
+	var k := "%s|%d" % [yol, boyut]
+	if _taban_onbellek.has(k):
+		return _taban_onbellek[k]
 	var img := _goruntu_yukle(yol)
 	if img == null:
 		return null
 	if img.get_width() > boyut or img.get_height() > boyut:
 		img.resize(boyut, boyut, Image.INTERPOLATE_LANCZOS)
 	img.convert(Image.FORMAT_RGBA8)
-	_alfa_uygula(img, esik, yumusaklik)
-	var tex := ImageTexture.create_from_image(img)
+	_taban_onbellek[k] = img
+	return img
+
+## Lekeyi ALFALI dokuya çevirir (koyu zemin -> şeffaf). Önbellekli.
+## esik: bu (normalize edilmiş) parlaklığın altı şeffaf. yumusaklik: kenar geçişi.
+func alfa_doku(yol: String, esik: float, yumusaklik: float, boyut: int = 256) -> Texture2D:
+	var anahtar := "%s|%0.3f|%0.3f|%d" % [yol, esik, yumusaklik, boyut]
+	if _alfa_onbellek.has(anahtar):
+		return _alfa_onbellek[anahtar]
+	var taban := _taban_goruntu(yol, boyut)
+	if taban == null:
+		return null
+	# _alfa_uygula girdiyi DEĞİŞTİRMEZ (yeni görüntü döndürür) -> taban güvende.
+	var tex := ImageTexture.create_from_image(_alfa_uygula(taban, esik, yumusaklik))
 	_alfa_onbellek[anahtar] = tex
 	return tex
 
-## Görüntüye alfa kanalı yazar. Parlaklık, GÖRÜNTÜNÜN EN PARLAK pikseline göre
-## normalize edilir. Böylece eşik sonuna kadar açılsa bile en parlak leke izi
-## görünür kalır (boyama asla "yok olmaz") ve koyu grunge zemini eşikle kesilerek
-## tüm yüzeyi kaplayan kir yerine ayrık leke izleri elde edilir.
-func _alfa_uygula(img: Image, esik: float, yumusaklik: float) -> void:
+## Görüntüye alfa kanalı yazar ve YENİ görüntü döndürür. Parlaklık, görüntünün EN
+## PARLAK pikseline göre normalize edilir (eşik sonuna açılsa bile en parlak iz
+## görünür kalır). Dairesel yumuşak kenar uygulanır (damgalar dikişsiz birleşir).
+## HIZ: piksel piksel get/set_pixel yerine HAM BAYT tamponu işlenir (10-50× hızlı)
+## -> boyarken kasma olmaz.
+func _alfa_uygula(img: Image, esik: float, yumusaklik: float) -> Image:
 	var w := img.get_width()
 	var h := img.get_height()
-	# 1) En parlak pikseli bul (normalize referansı)
-	var maks_lum := 0.001
-	for y in h:
-		for x in w:
-			var c := img.get_pixel(x, y)
-			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
-			if lum > maks_lum:
-				maks_lum = lum
-	# 2) Normalize parlaklığa göre alfa.
-	#    olcek_a = en parlak pikselin (lum=1) alacağı alfa. Tüm alfaları buna bölerek
-	#    en parlak iz DAİMA tam görünür olur -> eşik/yumuşaklık sonuna kadar açılsa
-	#    bile boyama asla yok olmaz; eşik yalnızca kaplama yoğunluğunu azaltır.
+	var data := img.get_data()   # PackedByteArray, RGBA8 (4 bayt/piksel)
+	var n := w * h
+	# 1) En parlak piksel (0..255)
+	var maks_lum := 1.0
+	for i in n:
+		var b := i * 4
+		var lum := data[b] * 0.299 + data[b + 1] * 0.587 + data[b + 2] * 0.114
+		if lum > maks_lum:
+			maks_lum = lum
+	# 2) Normalize + dairesel kenar
 	var e := clampf(esik, 0.0, 0.95)
 	var ust := e + maxf(yumusaklik, 0.0001)
 	var olcek_a := maxf(smoothstep(e, ust, 1.0), 0.001)
-	# Dairesel yumuşak kenar (radial falloff): kare sınırı yok edilir, böylece üst
-	# üste binen damgalar görünür dikiş olmadan SÜREKLİ kire dönüşür (referans gibi).
 	var cx := (w - 1) * 0.5
 	var cy := (h - 1) * 0.5
 	var maks_r := maxf(minf(cx, cy), 1.0)
-	for y in h:
-		for x in w:
-			var c := img.get_pixel(x, y)
-			var lum := (c.r * 0.299 + c.g * 0.587 + c.b * 0.114) / maks_lum
-			var a := clampf(smoothstep(e, ust, lum) / olcek_a, 0.0, 1.0)
-			var dx := (x - cx) / maks_r
-			var dy := (y - cy) / maks_r
-			var rr := sqrt(dx * dx + dy * dy)
-			a *= 1.0 - smoothstep(0.72, 1.08, rr)
-			c.a = a
-			img.set_pixel(x, y, c)
+	for i in n:
+		var b := i * 4
+		var lum := (data[b] * 0.299 + data[b + 1] * 0.587 + data[b + 2] * 0.114) / maks_lum
+		var a := clampf(smoothstep(e, ust, lum) / olcek_a, 0.0, 1.0)
+		var px := i % w
+		@warning_ignore("integer_division")
+		var py := i / w
+		var dx := (px - cx) / maks_r
+		var dy := (py - cy) / maks_r
+		var rr := sqrt(dx * dx + dy * dy)
+		a *= 1.0 - smoothstep(0.72, 1.08, rr)
+		data[b + 3] = int(a * 255.0)
+	return Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, data)
 
 func _goruntu_yukle(yol: String) -> Image:
 	# Editör eklentisi: kaynak PNG her zaman diskte mevcut. Import sistemine
