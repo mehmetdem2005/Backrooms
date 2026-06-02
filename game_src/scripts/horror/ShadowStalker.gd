@@ -35,6 +35,8 @@ var _grab_anim_t: float = 0.0
 var _arm_nodes: Array[MeshInstance3D] = []
 var _awareness: float = 0.0
 var _aggression: float = 0.0          # zamanla ve gördükçe artar → "sürekli kovalar"
+var _lock: float = 0.0                # Karma kilit sayacı (çok ses/uzun farkındalıkta dolar)
+var _rage_timer: float = 0.0          # kilit dolunca kısa süre AMANSIZ kovalama
 var _state_timer: float = 0.0
 var _lost_timer: float = 0.0
 var _current_state: String = "STALK"
@@ -228,11 +230,7 @@ func _update_perception(delta: float) -> void:
         if _current_state == "CHASE":
             decay = 0.02 + (1.0 - visibility) * 0.05
         _awareness = max(0.0, _awareness - delta * decay)
-
-    if can_see and _awareness > 0.20:
-        _set_state("CHASE")
-    elif heard and _awareness > 0.16 and _current_state != "CHASE":
-        _set_state("INVESTIGATE")
+    # Durum kararı tek yerde: _update_state_logic (Karma)
 
 func _predicted_player_cell() -> Vector3i:
     # lead-pursuit: oyuncunun gittiği yöne bir miktar önden hedefle
@@ -246,15 +244,52 @@ func _predicted_player_cell() -> Vector3i:
     var lead_world: Vector3 = player.global_position + pv.normalized() * (2.0 + _aggression * 3.0)
     return level_builder.world_to_grid(lead_world)
 
-func _update_state_logic(_delta: float) -> void:
-    # AMANSIZ TAKİP: nerede olursan ol, daima oyuncuya yol bul (katlar arası dahil).
-    var player_cell: Vector3i = level_builder.world_to_grid(player.global_position)
-    if _current_state != "CHASE":
+func _update_state_logic(delta: float) -> void:
+    # KARMA: sesle/görüşle avlar, sessiz+görünmezsen seni KAYBEDER; ama çok ses çıkarır
+    # veya uzun süre tam fark edilirsen KİLİTLENİR ve kısa süre AMANSIZ kovalar.
+    var pcell: Vector3i = level_builder.world_to_grid(player.global_position)
+    var loud: bool = _last_player_noise > 0.6
+    if loud or _awareness >= 0.99:
+        _lock = min(1.0, _lock + delta * (0.55 if loud else 0.30))
+    else:
+        _lock = max(0.0, _lock - delta * 0.12)
+    if _lock >= 1.0 and _rage_timer <= 0.0:
+        _rage_timer = 6.0
+        _lock = 0.0
+    _rage_timer = max(0.0, _rage_timer - delta)
+
+    if _rage_timer > 0.0:
+        # AMANSIZ: tam konuma kilitli
         _set_state("CHASE")
-    if _repath_timer <= 0.0 or _path.size() == 0:
-        _repath_timer = repath_interval
-        _request_path_to(_predicted_player_cell())
-        _last_known_player_cell = player_cell
+        _last_known_player_cell = pcell
+        if _repath_timer <= 0.0 or _path.is_empty():
+            _repath_timer = repath_interval
+            _request_path_to(pcell)
+        return
+
+    if _awareness > 0.30:
+        _set_state("CHASE")
+        if _repath_timer <= 0.0 or _path.is_empty():
+            _repath_timer = repath_interval
+            _request_path_to(_predicted_player_cell())
+    elif _awareness > 0.10:
+        if _current_state != "INVESTIGATE":
+            _set_state("INVESTIGATE")
+            _request_path_to(_last_known_player_cell)
+        elif _path.is_empty() or _arrived_to_cell(_last_known_player_cell):
+            _set_state("SEARCH")
+    else:
+        # KAYIP: son bilinen çevresinde ara; uzun süre bulamazsa başıboş dolan (seni kaybetti)
+        if _lost_timer > 8.0:
+            if _current_state != "STALK" or _path.is_empty() or _state_timer > 2.5:
+                _set_state("STALK")
+                _request_path_to(level_builder.get_random_open_cell_near(level_builder.world_to_grid(global_position), 4, 14, _rng))
+                _state_timer = 0.0
+        else:
+            if _current_state != "SEARCH" or _path.is_empty() or _state_timer > 1.5:
+                _set_state("SEARCH")
+                _request_path_to(level_builder.get_random_open_cell_near(_last_known_player_cell, 2, 8, _rng))
+                _state_timer = 0.0
 
 func _request_path_to(goal: Vector3i) -> void:
     if level_builder == null:
@@ -292,10 +327,14 @@ func _follow_path(delta: float) -> void:
         flat_to_target = target_position - global_position
         flat_to_target.y = 0.0
 
-    # Amansız kovalama: sabit hız. Suda (havuz) bir miktar yavaşlar ("arkandan yüzer").
+    # Hız duruma bağlı: kovalama hızlı, araştırma orta, başıboş yavaş. Suda yavaşlar.
     var spd: float = chase_speed
+    if _current_state == "INVESTIGATE" or _current_state == "SEARCH":
+        spd = investigate_speed
+    elif _current_state == "STALK":
+        spd = stalk_speed
     if level_builder.has_method("is_in_water") and level_builder.is_in_water(global_position):
-        spd = chase_speed * 0.62
+        spd *= 0.62
     var desired: Vector3 = flat_to_target.normalized() * spd
     velocity.x = move_toward(velocity.x, desired.x, 12.0 * delta)
     velocity.z = move_toward(velocity.z, desired.z, 12.0 * delta)
@@ -322,12 +361,16 @@ func _update_visual(delta: float) -> void:
         fear = max(fear, 0.82)
     if _material != null:
         _material.emission_energy_multiplier = 0.45 + fear * 1.6 + sin(_pulse_time * 13.0) * 0.12
-    # Modelin önü (+Z) DAİMA oyuncuya bakar (ürkütücü + yön doğru).
+    # Yön: kovalarken oyuncuya bakar (ürkütücü); ararken hareket yönüne bakar (seni kaybetti).
     if _model != null and player != null:
-        var d: Vector3 = player.global_position - global_position
-        d.y = 0.0
-        if d.length() > 0.05:
-            var target_yaw: float = atan2(d.x, d.z)
+        var face_dir: Vector3
+        if _current_state == "CHASE" or _rage_timer > 0.0:
+            face_dir = player.global_position - global_position
+        else:
+            face_dir = Vector3(velocity.x, 0.0, velocity.z)
+        face_dir.y = 0.0
+        if face_dir.length() > 0.1:
+            var target_yaw: float = atan2(face_dir.x, face_dir.z)
             _model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, clamp(delta * 9.0, 0.0, 1.0))
     # Lokomosyon animasyonu: hareket ederken yürü, dururken idle. Hız arttıkça hızlan (kovalama).
     if _anim != null and not _grabbing:

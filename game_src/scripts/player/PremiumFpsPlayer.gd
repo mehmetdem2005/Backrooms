@@ -183,6 +183,8 @@ func _toggle_flashlight() -> void:
     _flashlight_enabled = not _flashlight_enabled
     flashlight_toggled.emit(_flashlight_enabled)
     flashlight_clicked.emit(global_position)
+    # Fener aç/kapa küçük bir ses çıkarır (plan: 0.15) — canavar hızlı tıklamayı duyar
+    noise_level = max(noise_level, 0.15)
 
 func _build_body() -> void:
     # Rampalarda (kat geçişi) güvenli iniş/çıkış için zemin yapışması ve eğim toleransı.
@@ -455,14 +457,16 @@ func _update_camera_motion(delta: float) -> void:
     _head.position = Vector3(bob_x + shake_x, _base_camera_y + _crouch_offset + bob_y + breath_y + shake_y, 0.0)
 
 func _update_noise(delta: float) -> void:
-    var target_noise: float = 0.03
+    # Plan değerleri: yürüme 0.25, koşma 0.75, çömelme ~0.10, durağan ~0.02
+    var target_noise: float = 0.02
     if is_moving:
-        target_noise = 0.22
+        target_noise = 0.25
     if is_running:
-        target_noise = 0.82
+        target_noise = 0.75
     if is_crouching:
-        target_noise *= 0.35
-    if is_flashlight_on():
-        target_noise += 0.06
+        target_noise *= 0.40
+    # Suda (havuz) çıkardığın ses artar (su şıpırtısı)
+    if level_builder != null and level_builder.has_method("is_in_water") and level_builder.is_in_water(global_position):
+        target_noise = max(target_noise, 0.35) + (0.25 if is_moving else 0.0)
     target_noise += stress_level * 0.10
     noise_level = move_toward(noise_level, clamp(target_noise, 0.0, 1.0), delta * 2.8)
