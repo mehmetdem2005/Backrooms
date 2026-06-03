@@ -643,11 +643,8 @@ func _leke_mat(yol: String) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/kir_decal.gdshader")
 	mat.set_shader_parameter("tex", load(yol))
-	mat.set_shader_parameter("esik_min", 0.05)
-	mat.set_shader_parameter("esik_max", 0.22)
-	mat.set_shader_parameter("parlaklik", 1.0)
-	mat.set_shader_parameter("opaklik", 1.0)
-	mat.set_shader_parameter("rough", 0.8)
+	mat.set_shader_parameter("esik_min", 0.03)
+	mat.set_shader_parameter("esik_max", 0.10)
 	_leke_mat_cache[yol] = mat
 	return mat
 
