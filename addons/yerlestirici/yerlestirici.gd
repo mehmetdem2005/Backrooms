@@ -63,13 +63,14 @@ func _paneli_kur() -> void:
 	_panel.son_parca_istendi.connect(_son_parcayi_sec)
 	_panel.parca_secildi.connect(_parca_secildi)
 	_panel.mod_degisti.connect(_mod_degisti_geldi)
-	# Yan dock yerine 3B editörün üst menü şeridine ekle (ekranın üstü).
-	add_control_to_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _panel)
+	# Alt panele ekle (Output/Debugger gibi): "🧱 Yerleştirici" düğmesine dokununca
+	# açılır/kapanır. Ekranı kaplamaz, tam genişlik kullanır — mobil dostu.
+	add_control_to_bottom_panel(_panel, "🧱 Yerleştirici")
 	_sayaci_guncelle()
 
 func _panel_kaldir() -> void:
 	if _panel:
-		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _panel)
+		remove_control_from_bottom_panel(_panel)
 		_panel.queue_free()
 		_panel = null
 
