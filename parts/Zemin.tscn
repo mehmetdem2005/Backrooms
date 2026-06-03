@@ -1,28 +1,28 @@
 [gd_scene format=3]
 
+[ext_resource type="Shader" path="res://shaders/antitiling_zemin.gdshader" id="0_sh"]
 [ext_resource type="Texture2D" path="res://textures/zemin_1_albedo.png" id="1_alb"]
 [ext_resource type="Texture2D" path="res://textures/zemin_1_normal.png" id="2_nrm"]
 [ext_resource type="Texture2D" path="res://textures/zemin_1_roughness.png" id="3_rgh"]
 [ext_resource type="Texture2D" path="res://textures/zemin_1_ao.png" id="4_ao"]
 [ext_resource type="Texture2D" path="res://textures/zemin_1_metalic.png" id="5_met"]
-[ext_resource type="Texture2D" path="res://textures/zemin_1_height.png" id="6_hgt"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_duf1n"]
 size = Vector3(4, 0.12, 4)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_iq74w"]
-albedo_texture = ExtResource("1_alb")
-metallic = 1.0
-metallic_texture = ExtResource("5_met")
-roughness_texture = ExtResource("3_rgh")
-normal_enabled = true
-normal_texture = ExtResource("2_nrm")
-ao_enabled = true
-ao_texture = ExtResource("4_ao")
-heightmap_enabled = true
-heightmap_scale = 3.0
-heightmap_texture = ExtResource("6_hgt")
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_z1"]
+shader = ExtResource("0_sh")
+shader_parameter/tex_albedo = ExtResource("1_alb")
+shader_parameter/tex_normal = ExtResource("2_nrm")
+shader_parameter/tex_rough = ExtResource("3_rgh")
+shader_parameter/tex_metal = ExtResource("5_met")
+shader_parameter/tex_ao = ExtResource("4_ao")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/normal_scale = 1.0
+shader_parameter/macro_amount = 0.5
+shader_parameter/macro_scale = 0.18
+shader_parameter/warp_amount = 0.05
 
 [node name="Zemin" type="MeshInstance3D" unique_id=1151462640]
 mesh = SubResource("BoxMesh_duf1n")
-surface_material_override/0 = SubResource("StandardMaterial3D_iq74w")
+surface_material_override/0 = SubResource("ShaderMaterial_z1")
