@@ -27,18 +27,36 @@ class Saglayici:
 
 
 class GeminiSaglayici(Saglayici):
-	"""Nano Banana / Nano Banana Pro — Google Gemini görsel modelleri."""
-	def __init__(self, model: str, api_key: str | None = None):
+	"""Nano Banana / Nano Banana Pro — Google Gemini görsel modelleri.
+
+	İki mod:
+	  • AI Studio (vertex=False): api_key ile. UYARI: $300 krediyi atlayıp
+	    KARTTAN çekebilir.
+	  • Vertex AI (vertex=True): proje + ADC ile. Kullanım Vertex AI'ye yazılır,
+	    böylece $300 Free Trial kredisinden düşer. (gcloud ADC gerekir.)
+	"""
+	def __init__(self, model: str, api_key: str | None = None,
+				 vertex: bool = False, proje: str | None = None,
+				 lokasyon: str = "us-central1"):
 		try:
 			from google import genai
 		except ImportError as e:
 			raise SystemExit(
 				"google-genai kurulu değil. Kur:  pip install google-genai") from e
-		anahtar = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-		if not anahtar:
-			raise SystemExit("GEMINI_API_KEY (veya GOOGLE_API_KEY) tanımlı değil.")
 		self._genai = genai
-		self.client = genai.Client(api_key=anahtar)
+		if vertex:
+			proje = proje or os.environ.get("GOOGLE_CLOUD_PROJECT")
+			if not proje:
+				raise SystemExit("Vertex modu için --proje <PROJE_ID> (ya da "
+								 "GOOGLE_CLOUD_PROJECT) gerekli.")
+			lokasyon = lokasyon or os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+			# Kimlik: gcloud auth application-default login (ADC)
+			self.client = genai.Client(vertexai=True, project=proje, location=lokasyon)
+		else:
+			anahtar = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+			if not anahtar:
+				raise SystemExit("GEMINI_API_KEY (veya GOOGLE_API_KEY) tanımlı değil.")
+			self.client = genai.Client(api_key=anahtar)
 		self.model = model
 
 	def uret(self, prompt, boyut, referanslar=None):
@@ -89,13 +107,15 @@ class OpenAISaglayici(Saglayici):
 		return base64.b64decode(b64)
 
 
-def fabrika(provider: str, model: str | None = None, api_key: str | None = None) -> Saglayici:
+def fabrika(provider: str, model: str | None = None, api_key: str | None = None,
+			vertex: bool = False, proje: str | None = None,
+			lokasyon: str = "us-central1") -> Saglayici:
 	m = model or VARSAYILAN_MODELLER.get(provider)
 	if m is None:
 		raise SystemExit("Bilinmeyen provider: %s (seçenekler: %s)"
 						 % (provider, ", ".join(VARSAYILAN_MODELLER)))
 	if provider in ("nano-banana-pro", "nano-banana"):
-		return GeminiSaglayici(m, api_key)
+		return GeminiSaglayici(m, api_key, vertex=vertex, proje=proje, lokasyon=lokasyon)
 	if provider == "gpt-image":
 		return OpenAISaglayici(m, api_key)
 	raise SystemExit("Bilinmeyen provider: %s" % provider)

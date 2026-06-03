@@ -129,7 +129,8 @@ def asama_albedo(args) -> str:
 	albedo_yol = os.path.join(args.cikti, f"{args.ad}_albedo.png")
 	prompt = args.prompt + (SEAMLESS_EK if args.seamless else "")
 	print(f"• Albedo üretiliyor [{args.provider}] …")
-	sag = saglayicilar.fabrika(args.provider, args.model, args.api_key)
+	sag = saglayicilar.fabrika(args.provider, args.model, args.api_key,
+							   vertex=args.vertex, proje=args.proje, lokasyon=args.lokasyon)
 	ham = sag.uret(prompt, args.boyut, args.referans or None)
 	_kaydet_gorsel(ham, albedo_yol, args.boyut)
 	print(f"✓ Albedo: {albedo_yol}")
@@ -156,7 +157,8 @@ def asama_haritalar(args) -> None:
 				print(f"• {k:9s}: {v}  (yerel/heuristik)")
 	else:
 		import saglayicilar
-		sag = saglayicilar.fabrika(args.provider, args.model, args.api_key)
+		sag = saglayicilar.fabrika(args.provider, args.model, args.api_key,
+							   vertex=args.vertex, proje=args.proje, lokasyon=args.lokasyon)
 		for tip in args.harita:
 			yol = os.path.join(args.cikti, f"{args.ad}_{tip}.png")
 			print(f"• {tip} üretiliyor (AI, albedo referanslı) …")
@@ -188,6 +190,10 @@ def main() -> int:
 					choices=list(HARITA_PROMPTLARI), help="AI'ya ürettirilecek haritalar")
 	ap.add_argument("--harita-yontem", choices=["ai", "yerel"], default="ai",
 					help="ai: haritaları AI üretir (varsayılan) · yerel: numpy heuristik")
+	ap.add_argument("--vertex", action="store_true",
+					help="Vertex AI üzerinden çağır (kullanım $300 krediden düşer; gcloud ADC gerekir)")
+	ap.add_argument("--proje", help="Vertex için Google Cloud proje kimliği (GOOGLE_CLOUD_PROJECT)")
+	ap.add_argument("--lokasyon", default="us-central1", help="Vertex bölgesi (varsayılan us-central1)")
 	ap.add_argument("--boyut", type=int, default=1024, help="Kenar pikseli (varsayılan 1024)")
 	ap.add_argument("--cikti", default="textures", help="Doku klasörü (varsayılan textures/)")
 	ap.add_argument("--tur", choices=list(PARCA_BOYUT), help="Verilirse parts/<ad>.tscn yazılır")
