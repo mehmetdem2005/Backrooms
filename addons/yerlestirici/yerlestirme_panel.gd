@@ -25,7 +25,7 @@ var grup_adi: String = "Parcalar"
 # --- Leke (decal) ---
 var secili_leke: String = ""
 var leke_boyut: float = 0.8
-var leke_rastgele: bool = true
+var leke_rastgele: bool = false
 const LEKE_KLASORU := "res://textures/lekeler/"
 var _leke_btnlar: Array = []
 var _mod_leke: Button

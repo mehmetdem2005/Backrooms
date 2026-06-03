@@ -28,6 +28,8 @@ var _son_secilen: String = ""
 var _basili: bool = false
 var _son_hucre: Vector3 = Vector3(INF, INF, INF)
 var _basis_konumlari: Array[Vector3] = []   # bu basış/sürükleme boyunca konulan yerler (anlık dedup)
+var _leke_mat_cache: Dictionary = {}        # leke yolu -> paylaşılan ShaderMaterial (perf)
+var _leke_quad: PlaneMesh                    # tüm lekelerin paylaştığı birim kare (perf)
 
 func _enter_tree() -> void:
 	_parcalari_tara()
@@ -219,7 +221,9 @@ func _forward_3d_gui_input(kamera: Camera3D, olay: InputEvent) -> int:
 			_basili = false
 		return EditorPlugin.AFTER_GUI_INPUT_STOP
 
-	if _basili:
+	# Sürükleme: SADECE koy/sil seri yerleştirme. Leke modunda sürükleme YOK
+	# (tek dokunuş = tek leke; karalama değil, ayrıca kasmayı önler).
+	if _basili and _panel.mod != "leke":
 		if olay is InputEventMouseMotion and (olay.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 			_islem(kamera, olay.position)
 			return EditorPlugin.AFTER_GUI_INPUT_STOP
@@ -632,6 +636,19 @@ func _leke_grup(kok: Node) -> Node3D:
 	g.owner = kok
 	return g
 
+# Leke yolu için paylaşılan materyali döndürür (her tıkta yeniden yükleme yok = perf).
+func _leke_mat(yol: String) -> ShaderMaterial:
+	if _leke_mat_cache.has(yol):
+		return _leke_mat_cache[yol]
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/kir_decal.gdshader")
+	mat.set_shader_parameter("tex", load(yol))
+	mat.set_shader_parameter("alpha_boost", 2.0)
+	mat.set_shader_parameter("renk_boost", 1.25)
+	mat.set_shader_parameter("rough", 0.7)
+	_leke_mat_cache[yol] = mat
+	return mat
+
 func _leke_yerlestir(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 	var n := normal.normalized()
 	if n.length() < 0.5:
@@ -646,19 +663,14 @@ func _leke_yerlestir(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 	var boyut: float = _panel.leke_boyut * (randf_range(0.7, 1.35) if _panel.leke_rastgele else 1.0)
 	var basis := Basis(rx * boyut, n, ry * boyut)   # PlaneMesh yerel Y = normal
 
+	if _leke_quad == null:
+		_leke_quad = PlaneMesh.new()
+		_leke_quad.size = Vector2(1, 1)
 	var mi := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
-	pm.size = Vector2(1, 1)
-	mi.mesh = pm
+	mi.mesh = _leke_quad                              # paylaşılan mesh
 	mi.transform = Transform3D(basis, nokta + n * 0.012)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://shaders/kir_decal.gdshader")
-	mat.set_shader_parameter("tex", load(_panel.secili_leke))
-	mat.set_shader_parameter("alpha_boost", 2.0)
-	mat.set_shader_parameter("renk_boost", 1.25)
-	mat.set_shader_parameter("rough", 0.7)
-	mi.material_override = mat
+	mi.material_override = _leke_mat(_panel.secili_leke)   # önbellekli paylaşılan materyal
 	mi.set_meta("leke", true)
 	mi.name = "Leke"
 
