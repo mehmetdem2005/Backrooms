@@ -19,6 +19,7 @@ uniform float macro_scale = 0.10;
 uniform vec3 dirt_color : source_color = vec3(0.32, 0.26, 0.19);  // çamur tonu
 uniform float wet : hint_range(0.0, 1.0) = 0.4;   // ıslaklık (taban roughness düşür)
 uniform float normal_scale : hint_range(0.0, 2.0) = 1.0;
+uniform bool mirror = true;           // ayna-döşeme: kenarlar hep uyar -> dikiş çizgisi yok
 
 varying vec3 wp;
 
@@ -34,13 +35,22 @@ float fbm(vec2 p){ float s=0.0,a=0.5; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*
 void vertex(){ wp=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; }
 
 void fragment(){
-	vec2 buv = wp.xz / tile_size;
+	vec2 buv0 = wp.xz / tile_size;
+	vec2 buv = buv0;
+	if (mirror) {
+		// üçgen dalga: 0..1..0 -> her komşu karo aynalanır, kenarlar daima eşleşir
+		vec2 m = mod(buv0, 2.0);
+		buv = mix(m, 2.0 - m, step(vec2(1.0), m));
+	}
+	// sürekli türevler (aynalama sıçramasından etkilenmez) -> mip dikişi yok
+	vec2 ddx = dFdx(buv0);
+	vec2 ddy = dFdy(buv0);
 	vec2 duv = wp.xz / dirt_size + vec2(4.3, 1.7);
 
-	vec3 a = texture(albedo_tex, buv).rgb;
-	vec3 n = texture(normal_tex, buv).rgb;
-	float r = texture(rough_tex, buv).r;
-	float ao = texture(ao_tex, buv).r;
+	vec3 a = textureGrad(albedo_tex, buv, ddx, ddy).rgb;
+	vec3 n = textureGrad(normal_tex, buv, ddx, ddy).rgb;
+	float r = textureGrad(rough_tex, buv, ddx, ddy).r;
+	float ao = textureGrad(ao_tex, buv, ddx, ddy).r;
 
 	float dm = texture(dirt_mask, duv).r;           // beyaz = kir
 	float macro = fbm(wp.xz * macro_scale);
