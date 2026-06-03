@@ -19,7 +19,7 @@ uniform float macro_scale = 0.10;
 uniform vec3 dirt_color : source_color = vec3(0.32, 0.26, 0.19);  // çamur tonu
 uniform float wet : hint_range(0.0, 1.0) = 0.4;   // ıslaklık (taban roughness düşür)
 uniform float normal_scale : hint_range(0.0, 2.0) = 1.0;
-uniform bool mirror = true;           // ayna-döşeme: kenarlar hep uyar -> dikiş çizgisi yok
+uniform bool mirror = false;           // ayna-döşeme: kenarlar hep uyar -> dikiş çizgisi yok
 
 varying vec3 wp;
 
