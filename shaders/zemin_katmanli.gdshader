@@ -1,35 +1,24 @@
-// Katmanlı zemin shader'ı (Godot 4, Mobile uyumlu) — DÖNDÜRME YOK, dikiş yok.
-//
-// TEMİZ fayans tabanı + üstüne KİR (dirt) overlay'i.
-//  • Taban dünya-uzayında hizalı/periyodik (grout düzgün, doğal).
-//  • Kir, fayans ızgarasıyla ORANSIZ bir ölçekte (decorrelated) örneklenir -> kir
-//    deseni ızgarayla tekrar etmez.
-//  • Kir maskesi = kir-albedo'sunun parlaklığı (kir görseli siyah arka plan üstünde,
-//    siyah = kir yok) × büyük ölçekli organik gürültü -> kir düzensiz büyük lekeler
-//    halinde, her yerde rastgele/tekrarsız.
-//  • normal/roughness/ao maskeyle harmanlanır.
+// Islak çamurlu fayans (Godot 4, Mobile uyumlu) — referans görünümü.
+//  • Albedo referans dokudan (ıslak parlak fayans + kahve çamur).
+//  • ISLAKLIK: temiz fayans alanı düşük roughness (parlak yansıma), çamur mat.
+//  • TEKRAR KIRMA: çamur (kahve bileşen) büyük organik gürültüyle dağıtılır;
+//    "temiz" bölgelerde çamur ıslak gri fayansa çekilir -> kare tekrarı gözükmez,
+//    grout sabit (gri olduğu için korunur). Döndürme/ofset yok, dikiş yok.
 shader_type spatial;
-render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+render_mode cull_back, specular_schlick_ggx, diffuse_burley;
 
-// Temiz fayans
-uniform sampler2D base_albedo : source_color, filter_linear_mipmap, repeat_enable;
-uniform sampler2D base_normal : hint_normal, filter_linear_mipmap, repeat_enable;
-uniform sampler2D base_rough : hint_roughness_r, filter_linear_mipmap, repeat_enable;
-uniform sampler2D base_ao : hint_default_white, filter_linear_mipmap, repeat_enable;
-// Kir (siyah üstüne kahve)
-uniform sampler2D dirt_albedo : source_color, filter_linear_mipmap, repeat_enable;
-uniform sampler2D dirt_normal : hint_normal, filter_linear_mipmap, repeat_enable;
-uniform sampler2D dirt_rough : hint_roughness_r, filter_linear_mipmap, repeat_enable;
+uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 
-uniform float tile_size = 4.0;                 // fayans ızgara boyutu (m)
-uniform float dirt_size = 5.3;                 // kir ölçeği (4'e oransız = decorrelated)
-uniform float dirt_amount : hint_range(0.0, 1.5) = 1.0;     // kir yoğunluğu
-uniform float patch_scale = 0.10;              // büyük leke alanı (düşük = büyük)
-uniform float dirt_boost : hint_range(1.0, 4.0) = 2.2;      // kir rengini parlat
-uniform float dirt_roughness : hint_range(0.0, 1.0) = 0.9;  // çamur matlığı
+uniform float tile_size = 4.0;
+uniform float wet : hint_range(0.0, 1.0) = 0.85;            // ıslaklık (parlaklık)
+uniform float mud_amount : hint_range(0.0, 1.5) = 1.0;      // çamur yoğunluğu
+uniform float patch_scale = 0.11;                          // büyük leke alanı
+uniform float dirt_select : hint_range(1.0, 6.0) = 3.0;     // kahve-çamur ayrışma
+uniform vec3 clean_tile : source_color = vec3(0.52, 0.51, 0.47); // ıslak gri fayans
 uniform float normal_scale : hint_range(0.0, 2.0) = 1.0;
 
-varying vec3 v_wpos;
+varying vec3 wp;
 
 float hash21(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 float vnoise(vec2 p){
@@ -40,32 +29,25 @@ float vnoise(vec2 p){
 }
 float fbm(vec2 p){ float s=0.0,a=0.5; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*2.03+7.1; a*=0.5; } return s; }
 
-void vertex(){ v_wpos=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; }
+void vertex(){ wp=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; }
 
 void fragment(){
-	vec2 buv = v_wpos.xz / tile_size;             // fayans (hizalı, periyodik)
-	vec2 duv = v_wpos.xz / dirt_size + vec2(3.7, 1.9);  // kir (decorrelated)
+	vec2 uv = wp.xz / tile_size;
+	vec3 a = texture(albedo_tex, uv).rgb;
+	float brown = clamp((a.r - a.b) * dirt_select, 0.0, 1.0);   // çamur (grout gri -> ~0)
 
-	vec3 bA = texture(base_albedo, buv).rgb;
-	vec3 bN = texture(base_normal, buv).rgb;
-	float bR = texture(base_rough, buv).r;
-	float bAO = texture(base_ao, buv).r;
+	// Çamuru büyük organik gürültüyle dağıt (tekrarsız)
+	float dirt = smoothstep(0.30, 0.72, fbm(wp.xz * patch_scale)) * mud_amount;
+	float fb = clamp(brown * clamp(dirt * 2.0, 0.0, 1.0), 0.0, 1.0);
 
-	vec3 dA = texture(dirt_albedo, duv).rgb;
-	vec3 dN = texture(dirt_normal, duv).rgb;
-	float dRv = texture(dirt_rough, duv).r;
+	vec3 cleanv = mix(a, clean_tile, brown * 0.9);   // çamuru sil -> ıslak gri fayans
+	ALBEDO = mix(cleanv, a, clamp(brown * dirt * 2.2, 0.0, 1.0));
 
-	// Maske: kir-albedo parlaklığı (siyah=0) × büyük organik gürültü × miktar
-	float dl = max(dA.r, max(dA.g, dA.b));
-	dl = pow(clamp(dl * 3.0, 0.0, 1.0), 0.7);          // zayıf kiri de görünür yap
-	float patch = smoothstep(0.25, 0.70, fbm(v_wpos.xz * patch_scale));
-	float mask = clamp(dl * dirt_amount * mix(0.55, 1.35, patch), 0.0, 1.0);
-
-	ALBEDO = mix(bA, clamp(dA * dirt_boost, vec3(0.0), vec3(1.0)), mask);
-	NORMAL_MAP = mix(bN, dN, mask);
+	NORMAL_MAP = texture(normal_tex, uv).rgb;
 	NORMAL_MAP_DEPTH = normal_scale;
-	ROUGHNESS = mix(bR, max(dRv, dirt_roughness), mask);
+
+	// Islak fayans parlak (düşük roughness), çamur mat
+	ROUGHNESS = mix(mix(0.55, 0.13, wet), 0.72, fb);
 	METALLIC = 0.0;
-	AO = bAO * mix(1.0, 0.82, mask);
-	AO_LIGHT_AFFECT = 1.0;
+	SPECULAR = 0.85;
 }
