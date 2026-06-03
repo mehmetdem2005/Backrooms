@@ -87,16 +87,22 @@
 
   <label>Model</label>
   <select id="model">
-    <option value="gemini-3-pro-image-preview">Nano Banana Pro (gemini-3-pro-image-preview)</option>
-    <option value="gemini-2.5-flash-image">Nano Banana (gemini-2.5-flash-image)</option>
+    <option value="gemini-2.5-flash-image">Nano Banana (gemini-2.5-flash-image) ✓ us-central1</option>
+    <option value="gemini-3-pro-image-preview">Nano Banana Pro (gemini-3-pro-image-preview) → Bölge: global</option>
+    <option value="gemini-3.1-flash-image">Nano Banana 2 (gemini-3.1-flash-image) → global</option>
+    <option value="gemini-2.5-flash-image-preview">gemini-2.5-flash-image-preview</option>
+    <option value="imagen-4.0-generate-001">Imagen 4 (imagen-4.0-generate-001) — şimdilik çalışmaz*</option>
     <option value="__custom">Özel (elle yaz)…</option>
   </select>
   <input id="modelcustom" style="display:none;margin-top:6px" placeholder="model id">
 
   <div class="hint">
-    <b>Vertex proxy</b> = $300 krediden gider (önce proxy/KUR.md ile bir kez kur).
-    <b>API anahtarı</b> = karttan/free-tier (sentler).
-    Model bölgede yoksa "Bölge"yi <b>global</b> yap ya da modeli değiştir.
+    <b>Vertex proxy</b> = $300 krediden gider. <b>API anahtarı</b> = karttan (sentler).<br>
+    • <b>Nano Banana</b> (gemini-2.5-flash-image) → Bölge <b>us-central1</b> çalışır.<br>
+    • <b>Nano Banana Pro / 3.x</b> → Bölge <b>global</b> yap.<br>
+    • İlk istekte "Failed to fetch" derse <b>bir kez daha dene</b> (Cloud Run soğuk başlatma).<br>
+    • Imagen* farklı API kullanır, bu sürümde çalışmaz.<br>
+    • Her YENİ doku için <b>🗑 Yeni</b>'ye bas (model bazen önceki bağlamda metin döndürür).
   </div>
   <div class="row" style="justify-content:flex-end;margin-top:14px">
     <button class="mini alt" id="closesettings">Kapat</button>
