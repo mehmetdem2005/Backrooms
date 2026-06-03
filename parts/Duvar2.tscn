@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://textures/duvar2_albedo.png" id="1_a"]
+[ext_resource type="Texture2D" path="res://textures/duvar2_ao.png" id="2_ao"]
+[ext_resource type="Texture2D" path="res://textures/duvar2_normal.png" id="3_n"]
+[ext_resource type="Texture2D" path="res://textures/duvar2_roughness.png" id="4_r"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_d2"]
+size = Vector3(4, 3, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d2"]
+albedo_texture = ExtResource("1_a")
+roughness_texture = ExtResource("4_r")
+normal_enabled = true
+normal_texture = ExtResource("3_n")
+ao_enabled = true
+ao_texture = ExtResource("2_ao")
+
+[node name="Duvar2" type="Node3D" unique_id=1451380389]
+
+[node name="Yuzey" type="MeshInstance3D" parent="." unique_id=725147052]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+mesh = SubResource("BoxMesh_d2")
+surface_material_override/0 = SubResource("StandardMaterial3D_d2")
