@@ -417,7 +417,8 @@ func _yuzey_kirlet(mi: MeshInstance3D) -> Array[MultiMeshInstance3D]:
 			var b := Basis(u_yon * olc, v_yon * olc, n_yon).rotated(n_yon, randf() * TAU)
 			var p := merkez + u_yon * u + v_yon * v + n_yon * thin
 			mm.set_instance_transform(i, Transform3D(b, p))
-			mm.set_instance_color(i, Color(1, 1, 1, randf_range(0.45, 0.95)))
+			# Düşük opaklık: fayans dokusu altından görünsün (çamur "üstüne" sürülmüş gibi)
+			mm.set_instance_color(i, Color(1, 1, 1, randf_range(0.12, 0.45)))
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = "OtoKir"
 		mmi.multimesh = mm
@@ -444,16 +445,17 @@ func _islak_grime_materyali(yol: String) -> StandardMaterial3D:
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	mat.vertex_color_use_as_albedo = true     # MultiMesh renkleri -> per-instance opaklık
-	var koy := lerpf(0.18, 0.035, _panel.kir_koyuluk)
-	mat.albedo_color = Color(koy, koy * 0.88, koy * 0.72, 1.0)
+	# Çamur kahvesi (kapkara DEĞİL) — altındaki fayans görünür kalsın
+	var koy := lerpf(0.34, 0.12, _panel.kir_koyuluk)
+	mat.albedo_color = Color(koy, koy * 0.62, koy * 0.34, 1.0)
 	var isl := _panel.kir_islaklik
-	mat.roughness = lerpf(0.92, 0.13, isl)
+	mat.roughness = lerpf(0.85, 0.28, isl)
 	mat.metallic = 0.0
-	mat.metallic_specular = lerpf(0.5, 1.0, isl)
+	mat.metallic_specular = lerpf(0.5, 0.9, isl)
 	if isl > 0.2:
 		mat.clearcoat_enabled = true
-		mat.clearcoat = isl
-		mat.clearcoat_roughness = lerpf(0.3, 0.05, isl)
+		mat.clearcoat = isl * 0.7
+		mat.clearcoat_roughness = 0.15
 	return mat
 
 func _aktif_dokular() -> Array[String]:
@@ -531,10 +533,10 @@ func _atmosfer_kur() -> void:
 			break
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.012, 0.013, 0.016)
+	env.background_color = Color(0.09, 0.09, 0.10)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.10, 0.11, 0.14)
-	env.ambient_light_energy = 0.45
+	env.ambient_light_color = Color(0.6, 0.59, 0.58)   # loş ama fayans görünür
+	env.ambient_light_energy = 1.1
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.ssr_enabled = true
 	env.ssr_max_steps = 48
@@ -568,8 +570,8 @@ func _atmosfer_kur() -> void:
 			var x := lerpf(aabb.position.x + 1.0, aabb.position.x + aabb.size.x - 1.0, 0.5 if nx == 1 else float(ix) / float(nx - 1))
 			var z := lerpf(aabb.position.z + 1.0, aabb.position.z + aabb.size.z - 1.0, 0.5 if nz == 1 else float(iz) / float(nz - 1))
 			om.position = Vector3(x, ust, z)
-			om.light_energy = 2.2
-			om.omni_range = maxf(adimx, adimz) * 0.6 + 4.0
+			om.light_energy = 3.2
+			om.omni_range = maxf(adimx, adimz) * 0.6 + 5.0
 			om.light_color = Color(1.0, 0.95, 0.82)
 			grup.add_child(om)
 			om.owner = grup

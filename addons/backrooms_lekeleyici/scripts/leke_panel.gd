@@ -30,10 +30,10 @@ var islak: bool = false
 var kendinden_isikli: bool = false
 var ofset: float = 0.006                       # yüzeyden uzaklık (z-fighting önler)
 # --- Otomatik kirletme (MultiMesh) ---
-var kir_yogunluk: int = 22                     # m² başına grime damgası
-var kir_islaklik: float = 0.8                  # 0 mat .. 1 ıslak/parlak
-var kir_kenar: float = 0.6                     # kenarlara/derzlere yoğunlaşma
-var kir_koyuluk: float = 0.85                  # çamur koyuluğu (0 açık .. 1 koyu)
+var kir_yogunluk: int = 14                     # m² başına grime damgası
+var kir_islaklik: float = 0.5                  # 0 mat .. 1 ıslak/parlak
+var kir_kenar: float = 0.5                     # kenarlara/derzlere yoğunlaşma
+var kir_koyuluk: float = 0.45                  # çamur koyuluğu (0 açık kahve .. 1 koyu)
 
 var _kutuphane: LekeKutuphane
 var _palet_dugmeleri: Dictionary = {}          # yol -> Button
