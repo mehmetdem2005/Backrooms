@@ -123,7 +123,7 @@ let imgCount = 0;
 const LS = (k,d='')=> (localStorage.getItem(k) ?? d);
 function getMode(){ return LS('mode','vertex'); }
 function getKey(){ return LS('gemini_key'); }
-function getModel(){ return LS('gemini_model','gemini-3-pro-image-preview'); }
+function getModel(){ return LS('gemini_model','gemini-2.5-flash-image'); }
 function getProxy(){ return LS('proxy_url'); }
 function getProject(){ return LS('project'); }
 function getLocation(){ return LS('location','us-central1'); }
@@ -200,40 +200,47 @@ async function send(){
   if(mode==='vertex' && (!getProxy()||!getProject())){ addSys('Önce ⚙️ Vertex Proxy URL + Proje gir (proxy/KUR.md ile kur).'); $('#settings').showModal(); return; }
   if(!text){ return; }
 
+  // TEK-TUR: bağlam biriktirmez -> payload şişmez, model her seferinde görsel üretir.
   const parts=[{text}];
   if($('#attachlast').checked && lastImage){
     parts.push({ inline_data:{ mime_type:lastImage.mime, data:lastImage.b64 } });
     addSys('(son görsel referans olarak eklendi)');
   }
+  const contents=[{ role:'user', parts }];
+  const genCfg={ responseModalities:["Text","Image"] };
+
   addUser(text);
-  history.push({ role:'user', parts });
   $('#prompt').value='';
   busy=true; const sbtn=$('#send'); sbtn.disabled=true; sbtn.innerHTML='<span class="spin"></span>';
   const wait=addAItext('üretiliyor…');
 
-  try{
-    const genCfg={ responseModalities:["Text","Image"] };
-    let res;
+  async function birIstek(){
     if(mode==='vertex'){
-      res=await fetch(getProxy(),{
-        method:'POST',
+      return fetch(getProxy(),{ method:'POST',
         headers:{'Content-Type':'application/json','X-Proxy-Secret':getSecret()},
-        body:JSON.stringify({ project:getProject(), location:getLocation(), model, contents:history, generationConfig:genCfg })
-      });
-    } else {
-      res=await fetch(ENDPOINT(model)+'?key='+encodeURIComponent(getKey()),{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ contents:history, generationConfig:genCfg })
-      });
+        body:JSON.stringify({ project:getProject(), location:getLocation(), model, contents, generationConfig:genCfg }) });
     }
-    const data=await res.json();
-    wait.remove();
-    if(!res.ok){
-      addSys('HATA '+res.status+': '+((data.error&&data.error.message)||JSON.stringify(data)).slice(0,300));
-      // başarısız mesajı bağlamdan çıkar
-      history.pop();
-      return;
-    }
+    return fetch(ENDPOINT(model)+'?key='+encodeURIComponent(getKey()),{ method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contents, generationConfig:genCfg }) });
+  }
+
+  // OTOMATİK TEKRAR DENEME (soğuk başlatma / ağ / 5xx / 429) — 4 deneme
+  let data=null, hata='';
+  for(let i=0; i<4; i++){
+    try{
+      const res=await birIstek();
+      data=await res.json();
+      if(res.ok) { hata=''; break; }
+      hata='HATA '+res.status+': '+((data&&data.error&&data.error.message)||'').toString().slice(0,260);
+      if(res.status<500 && res.status!==429){ data=null; break; }   // 4xx (model/bölge/kod) -> tekrar anlamsız
+      data=null;
+    }catch(err){ hata='Bağlantı: '+err.message; data=null; }   // cold start / network -> tekrar dene
+    if(i<3){ wait.textContent='üretiliyor… (uyandırılıyor '+(i+2)+'/4)'; await new Promise(r=>setTimeout(r, 1600)); }
+  }
+
+  wait.remove();
+  try{
+    if(!data){ addSys(hata||'Bağlantı hatası — tekrar dene.'); return; }
     const cand=(data.candidates&&data.candidates[0])||null;
     const rparts=(cand&&cand.content&&cand.content.parts)||[];
     let gotImg=false, modelText='';
@@ -242,17 +249,9 @@ async function send(){
       if(inl&&inl.data){ addAIimage(inl.mimeType||inl.mime_type||'image/png', inl.data); gotImg=true; }
       else if(p.text){ modelText+=p.text; }
     }
-    if(modelText) addAItext(modelText);
-    if(!gotImg && !modelText) addSys('Boş yanıt geldi. Promtu netleştir ya da modeli değiştir.');
-    // bağlama SADECE metin ekle (görsel ekleme -> payload şişmesin)
-    history.push({ role:'model', parts:[{text: gotImg ? '[görsel üretildi]' : (modelText||'')}] });
-    // bağlam çok büyürse kırp
-    if(history.length>16) history=history.slice(-16);
-  }catch(err){
-    wait.remove();
-    addSys('Bağlantı hatası: '+err.message+'  (Tarayıcı CORS engellediyse sayfayı bir https adresinden açman gerekebilir — bana söyle.)');
-    history.pop();
-  }finally{
+    if(!gotImg && modelText) addAItext(modelText);
+    if(!gotImg && !modelText) addSys('Boş yanıt. Promtu netleştir ya da modeli değiştir.');
+  } finally {
     busy=false; sbtn.disabled=false; sbtn.textContent='Gönder';
   }
 }
