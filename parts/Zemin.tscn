@@ -17,11 +17,11 @@ shader_parameter/tex_normal = ExtResource("2_nrm")
 shader_parameter/tex_rough = ExtResource("3_rgh")
 shader_parameter/tex_metal = ExtResource("5_met")
 shader_parameter/tex_ao = ExtResource("4_ao")
-shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/tile_size = 4.0
 shader_parameter/normal_scale = 1.0
-shader_parameter/macro_amount = 0.5
-shader_parameter/macro_scale = 0.18
-shader_parameter/warp_amount = 0.05
+shader_parameter/macro_amount = 0.35
+shader_parameter/macro_scale = 0.12
+shader_parameter/per_tile_rotate = true
 
 [node name="Zemin" type="MeshInstance3D" unique_id=1151462640]
 mesh = SubResource("BoxMesh_duf1n")
