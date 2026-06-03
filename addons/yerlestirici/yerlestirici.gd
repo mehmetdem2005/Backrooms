@@ -20,49 +20,17 @@ const YUK_ADIM := 0.5
 
 var parcalar: Dictionary = {}     # ad -> {yol, ikon, eksen, kal, yuk}
 var _panel: YerlestirmePanel
-var _dock: ScrollContainer
-var _arac: HBoxContainer
-var _btn_koy: Button
-var _btn_sil: Button
 var _son_secilen: String = ""
 var _basili: bool = false
 var _son_hucre: Vector3 = Vector3(INF, INF, INF)
+var _basis_konumlari: Array[Vector3] = []   # bu basış/sürükleme boyunca konulan yerler (anlık dedup)
 
 func _enter_tree() -> void:
 	_parcalari_tara()
 	_paneli_kur()
-	_arac_kur()
 
 func _exit_tree() -> void:
-	if _arac:
-		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _arac)
-		_arac.queue_free()
-		_arac = null
 	_panel_kaldir()
-
-# Viewport üst barına Koy/Sil/Dur — modu buradan da aç/kapatabilirsin (etkinleştirmeyi garantiler).
-func _arac_kur() -> void:
-	_arac = HBoxContainer.new()
-	_arac.add_theme_constant_override("separation", 4)
-	_btn_koy = Button.new()
-	_btn_koy.text = "🧱 Koy"
-	_btn_koy.toggle_mode = true
-	_btn_koy.tooltip_text = "Yerleştirme modu (parçayı soldaki 'Yerleştirici' panelinden seç)"
-	_btn_koy.toggled.connect(func(a: bool): _mod_tikla("koy" if a else "yok"))
-	_arac.add_child(_btn_koy)
-	_btn_sil = Button.new()
-	_btn_sil.text = "🗑 Sil"
-	_btn_sil.toggle_mode = true
-	_btn_sil.modulate = Color(1.0, 0.78, 0.78)
-	_btn_sil.toggled.connect(func(a: bool): _mod_tikla("sil" if a else "yok"))
-	_arac.add_child(_btn_sil)
-	add_control_to_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _arac)
-
-func _mod_tikla(m: String) -> void:
-	if _panel:
-		_panel.mod_ayarla(m)
-		if m != "yok":
-			_editoru_aktiflestir()
 
 func _parca_secildi(ad: String) -> void:
 	_son_secilen = ad
@@ -78,14 +46,13 @@ func _editoru_aktiflestir() -> void:
 	EditorInterface.set_main_screen_editor("3D")
 	EditorInterface.edit_node(kok)
 
-func _arac_guncelle(m: String) -> void:
-	if _btn_koy:
-		_btn_koy.set_pressed_no_signal(m == "koy")
-	if _btn_sil:
-		_btn_sil.set_pressed_no_signal(m == "sil")
+# Mod değişince (panelin mod düğmelerinden) 3B görünümü aktif et: ilk tık yerleştirsin.
+func _mod_degisti_geldi(m: String) -> void:
+	if m != "yok":
+		_editoru_aktiflestir()
 
 
-# ---------------------------------------------------------------- Panel / dock
+# ------------------------------------------------- Panel (3B görünümün ÜSTÜNE)
 func _paneli_kur() -> void:
 	_panel = YerlestirmePanel.new()
 	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -95,20 +62,16 @@ func _paneli_kur() -> void:
 	_panel.tumunu_temizle_istendi.connect(_tumunu_temizle)
 	_panel.son_parca_istendi.connect(_son_parcayi_sec)
 	_panel.parca_secildi.connect(_parca_secildi)
-	_panel.mod_degisti.connect(_arac_guncelle)
-	_dock = ScrollContainer.new()
-	_dock.name = "Yerleştirici"
-	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_dock.add_child(_panel)
-	add_control_to_dock(EditorPlugin.DOCK_SLOT_LEFT_BR, _dock)
+	_panel.mod_degisti.connect(_mod_degisti_geldi)
+	# Yan dock yerine 3B editörün üst menü şeridine ekle (ekranın üstü).
+	add_control_to_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _panel)
 	_sayaci_guncelle()
 
 func _panel_kaldir() -> void:
-	if _dock:
-		remove_control_from_docks(_dock)
-		_dock.queue_free()
-		_dock = null
-	_panel = null
+	if _panel:
+		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, _panel)
+		_panel.queue_free()
+		_panel = null
 
 func _parcalari_yenile() -> void:
 	var onceki := _panel.secili_ad if _panel else ""
@@ -200,6 +163,7 @@ func _forward_3d_gui_input(kamera: Camera3D, olay: InputEvent) -> int:
 		if olay.pressed:
 			_basili = true
 			_son_hucre = Vector3(INF, INF, INF)
+			_basis_konumlari.clear()
 			_islem(kamera, olay.position)
 		else:
 			_basili = false
@@ -208,6 +172,7 @@ func _forward_3d_gui_input(kamera: Camera3D, olay: InputEvent) -> int:
 		if olay.pressed:
 			_basili = true
 			_son_hucre = Vector3(INF, INF, INF)
+			_basis_konumlari.clear()
 			_islem(kamera, olay.position)
 		else:
 			_basili = false
@@ -280,7 +245,8 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 		else:
 			hedef = Vector3(floorf(carpma.x / C) * C + C * 0.5, yuk, roundf(carpma.z / C) * C)
 
-	# Sürüklemede tekrarı engelle (snap: aynı hücre, serbest: min mesafe)
+	# Sürüklemede tekrarı engelle (snap: aynı hücre, serbest: min mesafe).
+	# Bu, TEK sürükleme/tıklama içinde aynı yere yeniden koymayı durdurur.
 	if _panel.snap_acik:
 		if hedef.is_equal_approx(_son_hucre):
 			return
@@ -288,15 +254,27 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 		if _son_hucre.x != INF and hedef.distance_to(_son_hucre) < C * 0.5:
 			return
 
-	# Üst üste binme engeli (sadece snap açıkken; serbest modda engel yok)
 	var tip_ad: String = ad.replace(" ", "")
-	if _panel.snap_acik:
-		for c in _tum_parcalar(kok):
-			if c.name.begins_with(tip_ad):
-				var fark: Vector3 = c.position - hedef
-				if absf(fark.x) < C * 0.45 and absf(fark.z) < C * 0.45 and absf(fark.y - yuk) < 0.5:
-					_son_hucre = hedef
-					return
+
+	# SAĞLAM ÇAKIŞMA ENGELİ (her modda): aynı/çok yakın koordinatta zaten parça
+	# varsa ASLA ikincisini koyma. "Tek tıkta 10 üst üste duvar" ve "bire bir aynı
+	# koordinatlı birden çok nesne" sorununu kökten bitirir. Y'yi de hesaba katar,
+	# böylece farklı YÜKSEKLİKLERE üst üste koymak (kat/stack) serbest kalır.
+	var esik_xz: float = maxf(C * 0.4, 0.2)
+	# (a) sahnede zaten duran parçalara karşı
+	for c in _tum_parcalar(kok):
+		if not c.name.begins_with(tip_ad):
+			continue
+		var fark: Vector3 = c.position - hedef
+		if absf(fark.x) < esik_xz and absf(fark.z) < esik_xz and absf(fark.y) < 0.25:
+			_son_hucre = hedef
+			return
+	# (b) bu basış boyunca konulanlara karşı (undo henüz işlenmemişse bile garanti)
+	for p in _basis_konumlari:
+		var fb: Vector3 = p - hedef
+		if absf(fb.x) < esik_xz and absf(fb.z) < esik_xz and absf(fb.y) < 0.25:
+			_son_hucre = hedef
+			return
 
 	var sahne: PackedScene = load(parcalar[ad]["yol"]) as PackedScene
 	if sahne == null:
@@ -331,6 +309,7 @@ func _yerlestir(kamera: Camera3D, ekran: Vector2) -> void:
 	ur.add_undo_method(grup, "remove_child", ornek)
 	ur.commit_action()
 	_son_hucre = hedef
+	_basis_konumlari.append(hedef)
 	_son_secilen = ad
 	_sayaci_guncelle()
 	_panel.durum_yaz("✓ %s @ (%.1f, %.1f, %.1f)" % [tip_ad, hedef.x, hedef.y, hedef.z])
