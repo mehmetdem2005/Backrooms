@@ -23,7 +23,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/yerlestirici/plugin.cfg", "res://addons/backrooms_lekeleyici/plugin.cfg")
+enabled=PackedStringArray("res://addons/yerlestirici/plugin.cfg")
 
 [input_devices]
 
