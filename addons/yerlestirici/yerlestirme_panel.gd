@@ -27,8 +27,10 @@ var secili_leke: String = ""
 var leke_boyut: float = 0.8
 var leke_rastgele: bool = false
 const LEKE_KLASORU := "res://textures/lekeler/"
-var _leke_btnlar: Array = []
-var _mod_leke: Button
+var _leke_yollari: Array[String] = []
+var _leke_index: int = 0
+var _leke_onizleme: Button
+var _leke_sayac: Label
 
 var _parcalar: Dictionary = {}          # ad -> bilgi (eklentiden)
 var _ayarlar: Dictionary = {}           # ad -> {olcek, donme, yukseklik, izgara}
@@ -246,19 +248,45 @@ func _arayuz_olustur() -> void:
 	lr.button_pressed = leke_rastgele
 	lr.toggled.connect(func(v): leke_rastgele = v)
 	add_child(lr)
-	# Leke paleti (textures/lekeler/ tara)
-	var lyollar := _leke_tara()
-	if lyollar.is_empty():
+	# Leke carousel: tek büyük önizleme + ◀ ▶ ile kaydırarak seç
+	_leke_yollari = _leke_tara()
+	if _leke_yollari.is_empty():
 		var u := Label.new()
 		u.text = "textures/lekeler/ boş — PNG ekle."
 		u.modulate = Color(1.0, 0.8, 0.5)
 		add_child(u)
 	else:
-		var lg := GridContainer.new()
-		lg.columns = 4
-		add_child(lg)
-		for yol in lyollar:
-			lg.add_child(_leke_dugme(yol))
+		# Büyük önizleme (panel genişliğine uyumlu kare çerçeve). Basınca da seçer.
+		_leke_onizleme = Button.new()
+		_leke_onizleme.custom_minimum_size = Vector2(0, 200)
+		_leke_onizleme.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_leke_onizleme.expand_icon = true
+		_leke_onizleme.add_theme_constant_override("icon_max_width", 196)
+		_leke_onizleme.tooltip_text = "Bu lekeyi seç (sonra yüzeye dokun)"
+		_leke_onizleme.pressed.connect(func(): _leke_sec_index())
+		add_child(_leke_onizleme)
+		# ◀  sayaç  ▶
+		var ok_sat := HBoxContainer.new()
+		ok_sat.add_theme_constant_override("separation", 6)
+		add_child(ok_sat)
+		var sol := Button.new()
+		sol.text = "◀"
+		sol.custom_minimum_size = Vector2(0, 46)
+		sol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sol.pressed.connect(_leke_git.bind(-1))
+		ok_sat.add_child(sol)
+		_leke_sayac = Label.new()
+		_leke_sayac.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_leke_sayac.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_leke_sayac.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ok_sat.add_child(_leke_sayac)
+		var sag := Button.new()
+		sag.text = "▶"
+		sag.custom_minimum_size = Vector2(0, 46)
+		sag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sag.pressed.connect(_leke_git.bind(1))
+		ok_sat.add_child(sag)
+		_leke_onizleme_guncelle()
 	var leke_dur := Button.new()
 	leke_dur.text = "✋ Leke modundan çık"
 	leke_dur.pressed.connect(func(): mod_ayarla("yok"))
@@ -371,9 +399,6 @@ func mod_ayarla(m: String) -> void:
 	if m != "koy":
 		for a in _parca_btnlar:
 			_parca_btnlar[a].button_pressed = false
-	if m != "leke":
-		for b in _leke_btnlar:
-			b.button_pressed = false
 	match m:
 		"koy": durum_yaz("→ KOY: %s" % (secili_ad if secili_ad != "" else "(parça seç)"))
 		"sil": durum_yaz("→ SİL (parçaya dokun / sürükle)")
@@ -397,26 +422,27 @@ func _leke_tara() -> Array[String]:
 	liste.sort()
 	return liste
 
-func _leke_dugme(yol: String) -> Button:
-	var b := Button.new()
-	b.toggle_mode = true
-	b.custom_minimum_size = Vector2(0, 56)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var tex := load(yol) as Texture2D
-	if tex != null:
-		b.icon = tex
-		b.expand_icon = true
-		b.add_theme_constant_override("icon_max_width", 48)
-	b.pressed.connect(leke_sec.bind(yol, b))
-	_leke_btnlar.append(b)
-	return b
+# ◀ ▶ ile leke değiştir (kaydırarak seç). Değiştirince o lekeyi seçer + leke moduna girer.
+func _leke_git(yon: int) -> void:
+	if _leke_yollari.is_empty():
+		return
+	_leke_index = (_leke_index + yon + _leke_yollari.size()) % _leke_yollari.size()
+	_leke_onizleme_guncelle()
+	_leke_sec_index()
 
-func leke_sec(yol: String, btn: Button) -> void:
-	secili_leke = yol
-	for b in _leke_btnlar:
-		b.button_pressed = (b == btn)
+func _leke_sec_index() -> void:
+	if _leke_yollari.is_empty():
+		return
+	secili_leke = _leke_yollari[_leke_index]
 	mod_ayarla("leke")
-	leke_secildi.emit(yol)
+	leke_secildi.emit(secili_leke)
+
+func _leke_onizleme_guncelle() -> void:
+	if _leke_onizleme == null or _leke_yollari.is_empty():
+		return
+	_leke_onizleme.icon = load(_leke_yollari[_leke_index]) as Texture2D
+	if _leke_sayac:
+		_leke_sayac.text = "%d / %d" % [_leke_index + 1, _leke_yollari.size()]
 
 # Geçerli parçanın ayarlarını sliderlara yansıtır (geri-besleme döngüsü olmadan).
 func _secimi_uygula() -> void:
