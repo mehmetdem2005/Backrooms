@@ -97,6 +97,8 @@ func _paneli_kur() -> void:
 	_panel.son_parca_istendi.connect(_son_parcayi_sec)
 	_panel.parca_secildi.connect(_parca_secildi)
 	_panel.mod_degisti.connect(_arac_guncelle)
+	_panel.kir_sac_istendi.connect(_kir_sac)
+	_panel.kir_temizle_istendi.connect(_kir_temizle)
 	_dock = ScrollContainer.new()
 	_dock.name = "Yerleştirici"
 	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -464,3 +466,81 @@ func _mesh_bul(n: Node) -> MeshInstance3D:
 		if r != null:
 			return r
 	return null
+
+# ---------------------------------------------------------------- AAA Kir (Decal)
+# Yerleşik zeminlerin üstüne benzersiz çamur decal'larını TEK MultiMesh ile saçar
+# (rastgele konum/dönüş/boyut -> tekrarsız; 1 draw call -> mobil dostu).
+func _kir_sac() -> void:
+	var kok: Node = EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	var parcalar_l := _tum_parcalar(kok)
+	if parcalar_l.is_empty():
+		_panel.durum_yaz("Önce zemin yerleştir, sonra kir saç")
+		return
+	var minx := INF; var maxx := -INF; var minz := INF; var maxz := -INF; var miny := INF
+	for c in parcalar_l:
+		var p: Vector3 = c.global_position
+		minx = minf(minx, p.x); maxx = maxf(maxx, p.x)
+		minz = minf(minz, p.z); maxz = maxf(maxz, p.z); miny = minf(miny, p.y)
+	minx -= 2.2; maxx += 2.2; minz -= 2.2; maxz += 2.2
+	var alan: float = maxf((maxx - minx) * (maxz - minz), 1.0)
+	var adet: int = clampi(int(alan * 0.8), 24, 3000)
+
+	var duzlem := PlaneMesh.new()
+	duzlem.size = Vector2(1, 1)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = duzlem
+	mm.instance_count = adet
+	for i in adet:
+		var x := randf_range(minx, maxx)
+		var z := randf_range(minz, maxz)
+		var s := randf_range(0.8, 2.6)
+		var sx := s * (1.0 if randf() < 0.5 else -1.0)
+		var b := Basis().rotated(Vector3.UP, randf() * TAU).scaled(Vector3(sx, 1.0, s))
+		mm.set_instance_transform(i, Transform3D(b, Vector3(x, miny + 0.02, z)))
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/kir_decal.gdshader")
+	mat.set_shader_parameter("tex", load("res://textures/dirt_albedo.png"))
+	mat.set_shader_parameter("alpha_boost", 2.0)
+	mat.set_shader_parameter("renk_boost", 1.4)
+	mat.set_shader_parameter("rough", 0.85)
+
+	var dmi := MultiMeshInstance3D.new()
+	dmi.name = "KirDecal"
+	dmi.multimesh = mm
+	dmi.material_override = mat
+	dmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	dmi.set_meta("kir_decal", true)
+
+	var ur := get_undo_redo()
+	ur.create_action("Zemine kir saç (%d decal)" % adet, UndoRedo.MERGE_DISABLE, kok)
+	ur.add_do_method(kok, "add_child", dmi, true)
+	ur.add_do_method(dmi, "set_owner", kok)
+	ur.add_do_reference(dmi)
+	ur.add_undo_method(kok, "remove_child", dmi)
+	ur.commit_action()
+	_panel.durum_yaz("✨ %d kir decal saçıldı (tek MultiMesh)" % adet)
+
+func _kir_temizle() -> void:
+	var kok: Node = EditorInterface.get_edited_scene_root()
+	if kok == null:
+		return
+	var sil: Array[Node] = []
+	for c in kok.get_children():
+		if c.has_meta("kir_decal"):
+			sil.append(c)
+	if sil.is_empty():
+		_panel.durum_yaz("Temizlenecek kir decal yok")
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Kiri temizle", UndoRedo.MERGE_DISABLE, kok)
+	for c in sil:
+		ur.add_do_method(kok, "remove_child", c)
+		ur.add_undo_method(kok, "add_child", c, true)
+		ur.add_undo_method(c, "set_owner", kok)
+		ur.add_undo_reference(c)
+	ur.commit_action()
+	_panel.durum_yaz("Kir decal temizlendi (%d)" % sil.size())

@@ -11,6 +11,8 @@ signal yenile_istendi()
 signal grubu_temizle_istendi()
 signal tumunu_temizle_istendi()
 signal son_parca_istendi()
+signal kir_sac_istendi()
+signal kir_temizle_istendi()
 
 const KATEGORI_SIRA := ["Zeminler", "Duvarlar", "Tavanlar", "Diğer"]
 
@@ -217,6 +219,23 @@ func _arayuz_olustur() -> void:
 	tekrar.text = "⟳ Son parçayı tekrar seç"
 	tekrar.pressed.connect(func(): son_parca_istendi.emit())
 	add_child(tekrar)
+
+	add_child(HSeparator.new())
+	var aaa := Label.new()
+	aaa.text = "✨ AAA Kir (Decal)"
+	aaa.modulate = Color(0.8, 0.85, 0.9)
+	add_child(aaa)
+	var kir_btn := Button.new()
+	kir_btn.text = "Zemine kir saç"
+	kir_btn.tooltip_text = "Yerleşik zeminlerin üstüne benzersiz çamur decal'ları saçar (MultiMesh, tek draw call)"
+	kir_btn.custom_minimum_size = Vector2(0, 40)
+	kir_btn.pressed.connect(func(): kir_sac_istendi.emit())
+	add_child(kir_btn)
+	var kir_temiz := Button.new()
+	kir_temiz.text = "Kiri temizle"
+	kir_temiz.modulate = Color(1.0, 0.8, 0.8)
+	kir_temiz.pressed.connect(func(): kir_temizle_istendi.emit())
+	add_child(kir_temiz)
 
 # --- Yardımcılar ---
 var _son_lbl: Label   # _kaydirici tarafından doldurulur
