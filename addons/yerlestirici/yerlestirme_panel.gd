@@ -13,6 +13,7 @@ signal tumunu_temizle_istendi()
 signal son_parca_istendi()
 signal kir_sac_istendi()
 signal kir_temizle_istendi()
+signal leke_secildi(yol: String)
 
 const KATEGORI_SIRA := ["Zeminler", "Duvarlar", "Tavanlar", "Diğer"]
 
@@ -20,6 +21,14 @@ var mod: String = "yok"
 var secili_ad: String = ""
 var snap_acik: bool = true
 var grup_adi: String = "Parcalar"
+
+# --- Leke (decal) ---
+var secili_leke: String = ""
+var leke_boyut: float = 0.8
+var leke_rastgele: bool = true
+const LEKE_KLASORU := "res://textures/lekeler/"
+var _leke_btnlar: Array = []
+var _mod_leke: Button
 
 var _parcalar: Dictionary = {}          # ad -> bilgi (eklentiden)
 var _ayarlar: Dictionary = {}           # ad -> {olcek, donme, yukseklik, izgara}
@@ -220,6 +229,41 @@ func _arayuz_olustur() -> void:
 	tekrar.pressed.connect(func(): son_parca_istendi.emit())
 	add_child(tekrar)
 
+	# --- LEKE (tıklayarak çıkartma yapıştır) ---
+	add_child(HSeparator.new())
+	var leke_baslik := Label.new()
+	leke_baslik.text = "🩸 Leke (tıkla → yapıştır)"
+	leke_baslik.add_theme_font_size_override("font_size", 14)
+	add_child(leke_baslik)
+	var leke_aciklama := Label.new()
+	leke_aciklama.text = "Bir leke seç, sonra sahnede istediğin yüzeye dokun → leke oraya yapışır."
+	leke_aciklama.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	leke_aciklama.modulate = Color(0.7, 0.78, 0.7)
+	add_child(leke_aciklama)
+	_kaydirici("Leke boyutu (m)", 0.1, 2.5, 0.05, leke_boyut, func(v): leke_boyut = v)
+	var lr := CheckBox.new()
+	lr.text = "Rastgele döndür/boyut"
+	lr.button_pressed = leke_rastgele
+	lr.toggled.connect(func(v): leke_rastgele = v)
+	add_child(lr)
+	# Leke paleti (textures/lekeler/ tara)
+	var lyollar := _leke_tara()
+	if lyollar.is_empty():
+		var u := Label.new()
+		u.text = "textures/lekeler/ boş — PNG ekle."
+		u.modulate = Color(1.0, 0.8, 0.5)
+		add_child(u)
+	else:
+		var lg := GridContainer.new()
+		lg.columns = 4
+		add_child(lg)
+		for yol in lyollar:
+			lg.add_child(_leke_dugme(yol))
+	var leke_dur := Button.new()
+	leke_dur.text = "✋ Leke modundan çık"
+	leke_dur.pressed.connect(func(): mod_ayarla("yok"))
+	add_child(leke_dur)
+
 	add_child(HSeparator.new())
 	var aaa := Label.new()
 	aaa.text = "✨ AAA Kir (Decal)"
@@ -327,11 +371,52 @@ func mod_ayarla(m: String) -> void:
 	if m != "koy":
 		for a in _parca_btnlar:
 			_parca_btnlar[a].button_pressed = false
+	if m != "leke":
+		for b in _leke_btnlar:
+			b.button_pressed = false
 	match m:
 		"koy": durum_yaz("→ KOY: %s" % (secili_ad if secili_ad != "" else "(parça seç)"))
 		"sil": durum_yaz("→ SİL (parçaya dokun / sürükle)")
+		"leke": durum_yaz("→ LEKE: yüzeye dokun → yapışır")
 		_: durum_yaz("(mod: yok)")
 	mod_degisti.emit(m)
+
+# --- Leke (decal) yardımcıları ---
+func _leke_tara() -> Array[String]:
+	var liste: Array[String] = []
+	var d := DirAccess.open(LEKE_KLASORU)
+	if d == null:
+		return liste
+	d.list_dir_begin()
+	var f := d.get_next()
+	while f != "":
+		if not d.current_is_dir() and f.get_extension().to_lower() == "png":
+			liste.append(LEKE_KLASORU + f)
+		f = d.get_next()
+	d.list_dir_end()
+	liste.sort()
+	return liste
+
+func _leke_dugme(yol: String) -> Button:
+	var b := Button.new()
+	b.toggle_mode = true
+	b.custom_minimum_size = Vector2(0, 56)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tex := load(yol) as Texture2D
+	if tex != null:
+		b.icon = tex
+		b.expand_icon = true
+		b.add_theme_constant_override("icon_max_width", 48)
+	b.pressed.connect(leke_sec.bind(yol, b))
+	_leke_btnlar.append(b)
+	return b
+
+func leke_sec(yol: String, btn: Button) -> void:
+	secili_leke = yol
+	for b in _leke_btnlar:
+		b.button_pressed = (b == btn)
+	mod_ayarla("leke")
+	leke_secildi.emit(yol)
 
 # Geçerli parçanın ayarlarını sliderlara yansıtır (geri-besleme döngüsü olmadan).
 func _secimi_uygula() -> void:

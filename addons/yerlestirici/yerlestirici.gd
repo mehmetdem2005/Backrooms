@@ -99,6 +99,7 @@ func _paneli_kur() -> void:
 	_panel.mod_degisti.connect(_arac_guncelle)
 	_panel.kir_sac_istendi.connect(_kir_sac)
 	_panel.kir_temizle_istendi.connect(_kir_temizle)
+	_panel.leke_secildi.connect(func(_yol): _editoru_aktiflestir())
 	_dock = ScrollContainer.new()
 	_dock.name = "Yerleştirici"
 	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -233,6 +234,8 @@ func _islem(kamera: Camera3D, ekran: Vector2) -> void:
 		_yerlestir(kamera, ekran)
 	elif _panel.mod == "sil":
 		_sil(kamera, ekran)
+	elif _panel.mod == "leke":
+		_leke_bas(kamera, ekran)
 
 func _zemin_noktasi(kamera: Camera3D, ekran: Vector2):
 	if kamera == null:
@@ -544,3 +547,127 @@ func _kir_temizle() -> void:
 		ur.add_undo_reference(c)
 	ur.commit_action()
 	_panel.durum_yaz("Kir decal temizlendi (%d)" % sil.size())
+
+# ---------------------------------------------------------------- Leke (decal)
+# Tıklanan ekran noktasından ışın atar, yerleşik parça kutularıyla kesiştirir;
+# en yakın yüzeye (doğru normalle) leke quad'ı yapıştırır. Kutu yoksa y=0 zemini.
+func _leke_bas(kamera: Camera3D, ekran: Vector2) -> void:
+	var kok: Node = EditorInterface.get_edited_scene_root()
+	if kok == null:
+		_panel.durum_yaz("Önce sahneyi aç")
+		return
+	if _panel.secili_leke == "":
+		_panel.durum_yaz("Önce bir leke seç")
+		return
+	var ro: Vector3 = kamera.project_ray_origin(ekran)
+	var rd: Vector3 = kamera.project_ray_normal(ekran)
+	var nokta: Vector3
+	var normal: Vector3
+	var en_t := INF
+	var bulundu := false
+	for c in _tum_parcalar(kok):
+		var h := _ray_kutu(c, ro, rd)
+		if h.is_empty():
+			continue
+		var t: float = h["t"]
+		if t < en_t:
+			en_t = t; nokta = h["nokta"]; normal = h["normal"]; bulundu = true
+	if not bulundu:
+		# y=0 zemin düzlemi
+		if absf(rd.y) < 0.000001:
+			return
+		var t0: float = -ro.y / rd.y
+		if t0 < 0.0:
+			return
+		nokta = ro + rd * t0; normal = Vector3.UP
+	_leke_yerlestir(kok, nokta, normal)
+
+# Işın-kutu (yerel uzayda AABB), dönüşü {t, nokta, normal} ya da {}.
+func _ray_kutu(parca: Node3D, ro: Vector3, rd: Vector3) -> Dictionary:
+	var mi := _mesh_bul(parca)
+	if mi == null or mi.mesh == null:
+		return {}
+	var aabb: AABB = mi.mesh.get_aabb()
+	var gt: Transform3D = mi.global_transform
+	var inv := gt.affine_inverse()
+	var lo := inv * ro
+	var ld := inv.basis * rd
+	var amin := aabb.position
+	var amax := aabb.position + aabb.size
+	var tnear := -INF; var tfar := INF; var nrm_eksen := 0; var nrm_isaret := 1.0
+	for i in 3:
+		var o: float = lo[i]; var d: float = ld[i]
+		if absf(d) < 1e-9:
+			if o < amin[i] or o > amax[i]:
+				return {}
+			continue
+		var t1: float = (amin[i] - o) / d
+		var t2: float = (amax[i] - o) / d
+		var isaret := -1.0
+		if t1 > t2:
+			var tmp := t1; t1 = t2; t2 = tmp; isaret = 1.0
+		if t1 > tnear:
+			tnear = t1; nrm_eksen = i; nrm_isaret = isaret
+		if t2 < tfar:
+			tfar = t2
+		if tnear > tfar:
+			return {}
+	if tfar < 0.0:
+		return {}
+	var th: float = tnear if tnear > 0.0 else tfar
+	var lp := lo + ld * th
+	var wp := gt * lp
+	var ln := Vector3.ZERO; ln[nrm_eksen] = nrm_isaret
+	var wn := (gt.basis * ln).normalized()
+	return {"t": (wp - ro).length(), "nokta": wp, "normal": wn}
+
+func _leke_grup(kok: Node) -> Node3D:
+	for c in kok.get_children():
+		if c is Node3D and c.name == "Lekeler" and c.has_meta("leke_grup"):
+			return c
+	var g := Node3D.new()
+	g.name = "Lekeler"
+	g.set_meta("leke_grup", true)
+	kok.add_child(g)
+	g.owner = kok
+	return g
+
+func _leke_yerlestir(kok: Node, nokta: Vector3, normal: Vector3) -> void:
+	var n := normal.normalized()
+	if n.length() < 0.5:
+		n = Vector3.UP
+	var yardim := Vector3.UP if absf(n.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
+	var tx := yardim.cross(n).normalized()
+	var ty := n.cross(tx).normalized()
+	var ac := randf() * TAU if _panel.leke_rastgele else 0.0
+	var co := cos(ac); var si := sin(ac)
+	var rx := tx * co + ty * si
+	var ry := -tx * si + ty * co
+	var boyut: float = _panel.leke_boyut * (randf_range(0.7, 1.35) if _panel.leke_rastgele else 1.0)
+	var basis := Basis(rx * boyut, n, ry * boyut)   # PlaneMesh yerel Y = normal
+
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1, 1)
+	mi.mesh = pm
+	mi.transform = Transform3D(basis, nokta + n * 0.012)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/kir_decal.gdshader")
+	mat.set_shader_parameter("tex", load(_panel.secili_leke))
+	mat.set_shader_parameter("alpha_boost", 2.0)
+	mat.set_shader_parameter("renk_boost", 1.25)
+	mat.set_shader_parameter("rough", 0.7)
+	mi.material_override = mat
+	mi.set_meta("leke", true)
+	mi.name = "Leke"
+
+	var grup := _leke_grup(kok)
+	var ur := get_undo_redo()
+	ur.create_action("Leke yapıştır", UndoRedo.MERGE_DISABLE, kok)
+	ur.add_do_method(grup, "add_child", mi, true)
+	ur.add_do_method(mi, "set_owner", kok)
+	ur.add_do_reference(mi)
+	ur.add_undo_method(grup, "remove_child", mi)
+	ur.commit_action()
+	_panel.durum_yaz("🩸 Leke yapıştırıldı")
