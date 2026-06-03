@@ -63,19 +63,40 @@
 
 <dialog id="settings">
   <h3>Ayarlar</h3>
-  <label>Gemini API anahtarı (AI Studio'dan)</label>
-  <input id="apikey" type="password" placeholder="AIza...">
+  <label>Mod</label>
+  <select id="mode">
+    <option value="vertex">Vertex proxy ($300 kredi)</option>
+    <option value="apikey">API anahtarı (sentler, kredisiz)</option>
+  </select>
+
+  <div id="vertexbox">
+    <label>Proxy URL (Cloud Run Service URL)</label>
+    <input id="proxyurl" placeholder="https://doku-proxy-xxxxx-uc.a.run.app">
+    <label>Proje kimliği</label>
+    <input id="project" placeholder="PROJE_ID">
+    <label>Bölge</label>
+    <input id="location" placeholder="us-central1 (Pro yoksa: global)">
+    <label>Gizli kod (PROXY_SECRET)</label>
+    <input id="secret" type="password" placeholder="gizli123">
+  </div>
+
+  <div id="apikeybox" style="display:none">
+    <label>Gemini API anahtarı (AI Studio'dan)</label>
+    <input id="apikey" type="password" placeholder="AIza...">
+  </div>
+
   <label>Model</label>
   <select id="model">
     <option value="gemini-3-pro-image-preview">Nano Banana Pro (gemini-3-pro-image-preview)</option>
-    <option value="gemini-2.5-flash-image">Nano Banana (gemini-2.5-flash-image) — ucuz</option>
+    <option value="gemini-2.5-flash-image">Nano Banana (gemini-2.5-flash-image)</option>
     <option value="__custom">Özel (elle yaz)…</option>
   </select>
   <input id="modelcustom" style="display:none;margin-top:6px" placeholder="model id">
+
   <div class="hint">
-    Anahtar: aistudio.google.com → Get API key. Cihazında saklanır, hiçbir yere gönderilmez (sadece Google API'sine).
-    Model çalışmazsa AI Studio'daki güncel görsel model adını "Özel"e yaz.
-    Not: API anahtarı $300 krediden değil, karttan/free-tier'dan gider (genelde sentler).
+    <b>Vertex proxy</b> = $300 krediden gider (önce proxy/KUR.md ile bir kez kur).
+    <b>API anahtarı</b> = karttan/free-tier (sentler).
+    Model bölgede yoksa "Bölge"yi <b>global</b> yap ya da modeli değiştir.
   </div>
   <div class="row" style="justify-content:flex-end;margin-top:14px">
     <button class="mini alt" id="closesettings">Kapat</button>
@@ -93,13 +114,29 @@ let busy = false;
 let imgCount = 0;
 
 // --- Ayarlar (localStorage) ---
-function getKey(){ return localStorage.getItem('gemini_key') || ''; }
-function getModel(){ return localStorage.getItem('gemini_model') || 'gemini-3-pro-image-preview'; }
-function refreshModelLbl(){ $('#modellbl').textContent = getModel(); }
+const LS = (k,d='')=> (localStorage.getItem(k) ?? d);
+function getMode(){ return LS('mode','vertex'); }
+function getKey(){ return LS('gemini_key'); }
+function getModel(){ return LS('gemini_model','gemini-3-pro-image-preview'); }
+function getProxy(){ return LS('proxy_url'); }
+function getProject(){ return LS('project'); }
+function getLocation(){ return LS('location','us-central1'); }
+function getSecret(){ return LS('secret'); }
+function refreshModelLbl(){ $('#modellbl').textContent = (getMode()==='vertex'?'Vertex · ':'API · ')+getModel(); }
 refreshModelLbl();
 
+function toggleMode(){
+  const v = $('#mode').value==='vertex';
+  $('#vertexbox').style.display = v?'block':'none';
+  $('#apikeybox').style.display = v?'none':'block';
+}
+$('#mode').onchange = toggleMode;
+
 $('#opensettings').onclick = ()=>{
+  $('#mode').value = getMode(); toggleMode();
   $('#apikey').value = getKey();
+  $('#proxyurl').value = getProxy(); $('#project').value = getProject();
+  $('#location').value = getLocation(); $('#secret').value = getSecret();
   const m = getModel();
   const sel = $('#model'); const known=[...sel.options].some(o=>o.value===m);
   if(known){ sel.value=m; $('#modelcustom').style.display='none'; }
@@ -109,7 +146,12 @@ $('#opensettings').onclick = ()=>{
 $('#model').onchange = e=>{ $('#modelcustom').style.display = e.target.value==='__custom'?'block':'none'; };
 $('#closesettings').onclick = ()=> $('#settings').close();
 $('#savesettings').onclick = ()=>{
+  localStorage.setItem('mode', $('#mode').value);
   localStorage.setItem('gemini_key', $('#apikey').value.trim());
+  localStorage.setItem('proxy_url', $('#proxyurl').value.trim());
+  localStorage.setItem('project', $('#project').value.trim());
+  localStorage.setItem('location', $('#location').value.trim()||'us-central1');
+  localStorage.setItem('secret', $('#secret').value.trim());
   let m = $('#model').value; if(m==='__custom') m = $('#modelcustom').value.trim();
   localStorage.setItem('gemini_model', m || 'gemini-3-pro-image-preview');
   refreshModelLbl(); $('#settings').close();
@@ -146,9 +188,10 @@ $('#prompt').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e
 
 async function send(){
   if(busy) return;
-  const key=getKey(); const model=getModel();
+  const mode=getMode(); const model=getModel();
   const text=$('#prompt').value.trim();
-  if(!key){ addSys('Önce ⚙️ ayarlardan API anahtarını gir.'); $('#settings').showModal(); return; }
+  if(mode==='apikey' && !getKey()){ addSys('Önce ⚙️ API anahtarını gir.'); $('#settings').showModal(); return; }
+  if(mode==='vertex' && (!getProxy()||!getProject())){ addSys('Önce ⚙️ Vertex Proxy URL + Proje gir (proxy/KUR.md ile kur).'); $('#settings').showModal(); return; }
   if(!text){ return; }
 
   const parts=[{text}];
@@ -163,10 +206,20 @@ async function send(){
   const wait=addAItext('üretiliyor…');
 
   try{
-    const body={ contents:history, generationConfig:{ responseModalities:["Text","Image"] } };
-    const res=await fetch(ENDPOINT(model)+'?key='+encodeURIComponent(key),{
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
-    });
+    const genCfg={ responseModalities:["Text","Image"] };
+    let res;
+    if(mode==='vertex'){
+      res=await fetch(getProxy(),{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Proxy-Secret':getSecret()},
+        body:JSON.stringify({ project:getProject(), location:getLocation(), model, contents:history, generationConfig:genCfg })
+      });
+    } else {
+      res=await fetch(ENDPOINT(model)+'?key='+encodeURIComponent(getKey()),{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ contents:history, generationConfig:genCfg })
+      });
+    }
     const data=await res.json();
     wait.remove();
     if(!res.ok){
@@ -199,7 +252,8 @@ async function send(){
 }
 
 // İlk açılış
-if(!getKey()){ addSys('Hoş geldin. ⚙️ ayarlardan API anahtarını gir, sonra ne üreteceğini yaz.'); }
+const _ready = (getMode()==='vertex') ? (getProxy()&&getProject()) : !!getKey();
+if(!_ready){ addSys('Hoş geldin. ⚙️ Ayarlar: "Vertex proxy ($300 kredi)" seç + Proxy URL/Proje gir (proxy/KUR.md), ya da "API anahtarı" seç.'); }
 else { addSys('Hazır. Ne üreteyim? (ör: backrooms kirli ıslak fayans, dikişsiz, tepeden, 4K)'); }
 addSys('İpucu: bir doku beğenince "↺ Referans yap" → "bunun normal/roughness haritasını yap" diyerek devam et.');
 </script>
