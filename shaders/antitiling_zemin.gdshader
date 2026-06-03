@@ -1,8 +1,12 @@
-// Anti-tiling zemin shader'ı (Godot 4, Mobile uyumlu).
-// Tekrarı KIRAR: dokuyu DÜNYA-uzayında karelere böler ve her kareyi hash'e göre
-// rastgele 90° döndürür + yatay çevirir. Kare fayans simetrik olduğundan grout
-// hizalı kalır ama KİR/LEKE şekilleri her karede farklılaşır -> geometrik tekrar
-// gözükmez. textureGrad ile mipmap dikişleri önlenir.
+// Anti-tiling zemin shader'ı (Godot 4, Mobile uyumlu) — DÖNDÜRME YOK, dikiş yok.
+//
+// Fikir: Fayans ızgarası (grout) düzenli tekrar eder -> bu DOĞAL, dokunma.
+// Yapay duran, KİRİN her karede aynı tekrarlaması. Bu yüzden:
+//  • Doku dünya-uzayında hizalı/periyodik örneklenir (grout sağlam, ofset/döndürme yok).
+//  • Kir KAHVERENGİ (grout gri) -> kahve bileşeninden ayrıştırılır.
+//  • Büyük ölçekli, çok-oktavlı, TEKRARSIZ gürültüyle kir yerelde temizlenir/derinleşir.
+//    Böylece kir düzensiz büyük lekeler halinde olur; tekrarlayan kare deseni gözükmez.
+//  • Grout gri olduğu için temizlemeden etkilenmez -> kenar çizgileri her yerde tutarlı.
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
@@ -12,11 +16,12 @@ uniform sampler2D tex_rough : hint_roughness_r, filter_linear_mipmap, repeat_ena
 uniform sampler2D tex_metal : hint_default_black, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_ao : hint_default_white, filter_linear_mipmap, repeat_enable;
 
-uniform float tile_size = 4.0;                     // bir doku tekrarının dünya boyutu (m)
+uniform float tile_size = 4.0;                 // bir doku tekrarının dünya boyutu (m)
 uniform float normal_scale : hint_range(0.0, 2.0) = 1.0;
-uniform float macro_amount : hint_range(0.0, 1.0) = 0.35;
-uniform float macro_scale = 0.12;
-uniform bool per_tile_rotate = true;               // kare başına rastgele döndürme/çevirme
+uniform float grime_scale = 0.13;              // leke alanı frekansı (düşük = büyük lekeler)
+uniform float grime_amount : hint_range(0.0, 1.0) = 0.75;  // ne kadar bölge temizlensin
+uniform float dirt_select : hint_range(0.5, 6.0) = 3.0;    // kahve-kir ayrışma keskinliği
+uniform vec3 clean_tile_color : source_color = vec3(0.74, 0.73, 0.70);
 
 varying vec3 v_wpos;
 
@@ -32,13 +37,10 @@ float vnoise(vec2 p) {
 	vec2 u = f * f * (3.0 - 2.0 * f);
 	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
-float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.03) * 0.3 + vnoise(p * 4.01) * 0.1; }
-
-vec2 rot90_dir(vec2 d, int k) {
-	if (k == 1) return vec2(-d.y, d.x);
-	if (k == 2) return -d;
-	if (k == 3) return vec2(d.y, -d.x);
-	return d;
+float fbm(vec2 p) {
+	float s = 0.0, a = 0.5;
+	for (int i = 0; i < 5; i++) { s += a * vnoise(p); p = p * 2.03 + 7.1; a *= 0.5; }
+	return s;
 }
 
 void vertex() {
@@ -46,42 +48,34 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 tc = v_wpos.xz / tile_size;
-	vec2 cell = floor(tc);
-	vec2 f = fract(tc);
+	// Hizalı, periyodik UV (dünya-uzayı) -> grout düzgün, döndürme/ofset YOK
+	vec2 uv = v_wpos.xz / tile_size;
 
-	int rot = 0;
-	bool flipx = false;
-	if (per_tile_rotate) {
-		rot = int(floor(hash21(cell) * 4.0));
-		flipx = hash21(cell + 7.3) > 0.5;
-	}
+	vec3 alb = texture(tex_albedo, uv).rgb;
+	// Kir = KAHVERENGİ bileşen (grout gri olduğu için ~0 -> grout korunur)
+	float brown = clamp((alb.r - alb.b) * dirt_select, 0.0, 1.0);
 
-	// Sürekli türevler (mipmap için), aynı dönüşümle döndürülür -> dikiş yok
-	vec2 ddx = dFdx(tc);
-	vec2 ddy = dFdy(tc);
-	if (flipx) { f.x = 1.0 - f.x; ddx.x = -ddx.x; ddy.x = -ddy.x; }
-	// f'i kare merkezinde döndür
-	vec2 fc = f - 0.5;
-	fc = rot90_dir(fc, rot);
-	f = fc + 0.5;
-	ddx = rot90_dir(ddx, rot);
-	ddy = rot90_dir(ddy, rot);
+	// Büyük ölçekli, tekrarsız kir alanı (iki decorrelated katman)
+	float field = fbm(v_wpos.xz * grime_scale) * 0.7
+				+ fbm(v_wpos.xz * grime_scale * 2.37 + 19.3) * 0.3;
+	float keep = smoothstep(0.40, 0.72, field);          // 1 = kir kalsın, 0 = temizle
+	keep = mix(1.0 - grime_amount, 1.0, keep);
 
-	vec3 alb = textureGrad(tex_albedo, f, ddx, ddy).rgb;
-	float macro = fbm(v_wpos.xz * macro_scale);
-	float v = mix(1.0 - macro_amount, 1.0 + macro_amount * 0.3, macro);
-	ALBEDO = alb * v;
+	// Temiz bölgede kahve kiri fayans rengine çek (grout'a dokunmaz)
+	vec3 cleanA = mix(alb, clean_tile_color, brown * 0.9);
+	vec3 outA = mix(cleanA, alb, keep);
+	// Kirli bölgede ekstra organik koyulaşma (yeni, tekrarsız şekiller)
+	float extra = clamp((field - 0.62) * 2.5, 0.0, 1.0) * brown;
+	outA *= mix(1.0, 0.7, extra);
+	ALBEDO = outA;
 
-	vec3 n = textureGrad(tex_normal, f, ddx, ddy).rgb;
-	vec2 nxy = n.xy * 2.0 - 1.0;
-	if (flipx) nxy.x = -nxy.x;
-	nxy = rot90_dir(nxy, rot);
-	NORMAL_MAP = vec3(nxy * 0.5 + 0.5, n.z);
-	NORMAL_MAP_DEPTH = normal_scale;
+	NORMAL_MAP = texture(tex_normal, uv).rgb;
+	NORMAL_MAP_DEPTH = normal_scale * mix(0.5, 1.0, keep);  // temizde kir kabartması azalır
 
-	ROUGHNESS = textureGrad(tex_rough, f, ddx, ddy).r;
-	METALLIC = textureGrad(tex_metal, f, ddx, ddy).r;
-	AO = textureGrad(tex_ao, f, ddx, ddy).r;
+	float r = texture(tex_rough, uv).r;
+	ROUGHNESS = mix(0.55, r, keep);                        // temiz alan daha düzgün
+	METALLIC = texture(tex_metal, uv).r;
+	float ao = texture(tex_ao, uv).r;
+	AO = mix(mix(ao, 1.0, 0.6), ao, keep);                 // temizde AO lekesi azalır
 	AO_LIGHT_AFFECT = 1.0;
 }
