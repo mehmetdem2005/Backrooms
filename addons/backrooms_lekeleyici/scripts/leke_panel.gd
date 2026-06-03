@@ -30,7 +30,7 @@ var islak: bool = false
 var kendinden_isikli: bool = false
 var ofset: float = 0.006                       # yüzeyden uzaklık (z-fighting önler)
 # --- Otomatik kirletme (MultiMesh) ---
-var kir_yogunluk: int = 14                     # m² başına grime damgası
+var kir_yogunluk: int = 6                       # m² başına grime damgası (küçük yamalar)
 var kir_islaklik: float = 0.5                  # 0 mat .. 1 ıslak/parlak
 var kir_kenar: float = 0.5                     # kenarlara/derzlere yoğunlaşma
 var kir_koyuluk: float = 0.45                  # çamur koyuluğu (0 açık kahve .. 1 koyu)
@@ -241,7 +241,7 @@ func _arayuz_olustur() -> void:
 	ok_aciklama.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ok_aciklama.modulate = Color(0.7, 0.78, 0.7)
 	add_child(ok_aciklama)
-	_kaydirici("Yoğunluk (m²/adet)", 4, 80, 1, kir_yogunluk, func(v): kir_yogunluk = int(v))
+	_kaydirici("Yoğunluk (m²/adet)", 1, 30, 1, kir_yogunluk, func(v): kir_yogunluk = int(v))
 	_kaydirici("Islaklık / parlaklık", 0.0, 1.0, 0.01, kir_islaklik, func(v): kir_islaklik = v)
 	_kaydirici("Kenar yoğunlaşması", 0.0, 1.0, 0.01, kir_kenar, func(v): kir_kenar = v)
 	_kaydirici("Koyuluk", 0.0, 1.0, 0.01, kir_koyuluk, func(v): kir_koyuluk = v)

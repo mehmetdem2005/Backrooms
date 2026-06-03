@@ -413,12 +413,14 @@ func _yuzey_kirlet(mi: MeshInstance3D) -> Array[MultiMeshInstance3D]:
 		for i in pay:
 			var u := _kenar_bias(hu, kenar)
 			var v := _kenar_bias(hv, kenar)
-			var olc := randf_range(0.22, 0.6) * (hu + hv)
+			# KÜÇÜK yamalar: mutlak metre boyut (yüzeyle ölçeklenMEZ), ufak parçalarda kırpılır.
+			# Böylece fayans baskın kalır, çamur üstüne saçılmış lekeler gibi durur.
+			var olc := minf(randf_range(0.18, 0.7), minf(hu, hv) * 1.2)
 			var b := Basis(u_yon * olc, v_yon * olc, n_yon).rotated(n_yon, randf() * TAU)
-			var p := merkez + u_yon * u + v_yon * v + n_yon * thin
+			var p := merkez + u_yon * u + v_yon * v + n_yon * (thin + float(di) * 0.003)
 			mm.set_instance_transform(i, Transform3D(b, p))
-			# Düşük opaklık: fayans dokusu altından görünsün (çamur "üstüne" sürülmüş gibi)
-			mm.set_instance_color(i, Color(1, 1, 1, randf_range(0.12, 0.45)))
+			# Orta opaklık: katmanlar üst üste yığılmasın diye az; fayans altından görünür.
+			mm.set_instance_color(i, Color(1, 1, 1, randf_range(0.2, 0.55)))
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = "OtoKir"
 		mmi.multimesh = mm
@@ -465,10 +467,10 @@ func _aktif_dokular() -> Array[String]:
 	if liste.is_empty():
 		for y in _kutuphane.yollar:
 			liste.append(y)
-	# Çok fazla katman olmasın diye en çok 6 doku kullan
-	if liste.size() > 6:
+	# En çok 3 doku katmanı: fazlası fayansı boğar (üst üste yığılır).
+	if liste.size() > 3:
 		liste.shuffle()
-		liste = liste.slice(0, 6)
+		liste = liste.slice(0, 3)
 	return liste
 
 # Hedef mesh'leri topla (otomatik kir / leke düğümleri hariç).
@@ -533,10 +535,10 @@ func _atmosfer_kur() -> void:
 			break
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.09, 0.09, 0.10)
+	env.background_color = Color(0.07, 0.07, 0.08)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.6, 0.59, 0.58)   # loş ama fayans görünür
-	env.ambient_light_energy = 1.1
+	env.ambient_light_color = Color(0.55, 0.54, 0.52)   # loş ama fayans görünür
+	env.ambient_light_energy = 0.95
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.ssr_enabled = true
 	env.ssr_max_steps = 48

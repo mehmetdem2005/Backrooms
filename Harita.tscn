@@ -2,10 +2,10 @@
 
 [sub_resource type="Environment" id="Environment_ueg10"]
 background_mode = 1
-background_color = Color(0.09, 0.09, 0.1, 1)
+background_color = Color(0.08, 0.08, 0.09, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.55, 0.55, 0.57, 1)
-ambient_light_energy = 1.0
+ambient_light_color = Color(0.53, 0.52, 0.52, 1)
+ambient_light_energy = 0.95
 tonemap_mode = 4
 ssr_enabled = true
 
