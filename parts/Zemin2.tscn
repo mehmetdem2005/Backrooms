@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://shaders/zemin_pbr.gdshader" id="0_sh"]
+[ext_resource type="Texture2D" path="res://textures/zeminB_albedo.png" id="1_a"]
+[ext_resource type="Texture2D" path="res://textures/zeminB_normal.png" id="2_n"]
+[ext_resource type="Texture2D" path="res://textures/zeminB_roughness.png" id="3_r"]
+[ext_resource type="Texture2D" path="res://textures/zeminB_ao.png" id="4_ao"]
+[ext_resource type="Texture2D" path="res://textures/zeminB_dirtmask.png" id="5_dm"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_z2"]
+size = Vector3(4, 0.12, 4)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_z2"]
+shader = ExtResource("0_sh")
+shader_parameter/albedo_tex = ExtResource("1_a")
+shader_parameter/normal_tex = ExtResource("2_n")
+shader_parameter/rough_tex = ExtResource("3_r")
+shader_parameter/ao_tex = ExtResource("4_ao")
+shader_parameter/dirt_mask = ExtResource("5_dm")
+shader_parameter/tile_size = 6.0
+shader_parameter/dirt_size = 7.7
+shader_parameter/dirt_amount = 0.9
+shader_parameter/macro_scale = 0.1
+shader_parameter/dirt_color = Color(0.32, 0.26, 0.19, 1)
+shader_parameter/wet = 0.4
+shader_parameter/normal_scale = 1.0
+
+[node name="Zemin2" type="MeshInstance3D"]
+mesh = SubResource("BoxMesh_z2")
+surface_material_override/0 = SubResource("ShaderMaterial_z2")
