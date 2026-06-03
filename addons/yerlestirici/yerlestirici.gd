@@ -643,9 +643,11 @@ func _leke_mat(yol: String) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/kir_decal.gdshader")
 	mat.set_shader_parameter("tex", load(yol))
-	mat.set_shader_parameter("alpha_boost", 2.0)
-	mat.set_shader_parameter("renk_boost", 1.25)
-	mat.set_shader_parameter("rough", 0.7)
+	mat.set_shader_parameter("esik_min", 0.05)
+	mat.set_shader_parameter("esik_max", 0.22)
+	mat.set_shader_parameter("parlaklik", 1.0)
+	mat.set_shader_parameter("opaklik", 1.0)
+	mat.set_shader_parameter("rough", 0.8)
 	_leke_mat_cache[yol] = mat
 	return mat
 
@@ -682,4 +684,9 @@ func _leke_yerlestir(kok: Node, nokta: Vector3, normal: Vector3) -> void:
 	ur.add_do_reference(mi)
 	ur.add_undo_method(grup, "remove_child", mi)
 	ur.commit_action()
-	_panel.durum_yaz("🩸 Leke yapıştırıldı")
+	# Konulan lekeyi SEÇ: 'Leke modundan çık'a basınca oklar (gizmo) hazır olur,
+	# boyut/konum/döndürme editörden ayarlanır.
+	var sec := EditorInterface.get_selection()
+	sec.clear()
+	sec.add_node(mi)
+	_panel.durum_yaz("🩸 Leke kondu. Boyut/taşıma için: 'Leke modundan çık' → oklarla ayarla")
