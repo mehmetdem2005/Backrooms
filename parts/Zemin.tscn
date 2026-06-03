@@ -12,11 +12,10 @@ shader = ExtResource("0_sh")
 shader_parameter/albedo_tex = ExtResource("1_a")
 shader_parameter/normal_tex = ExtResource("2_n")
 shader_parameter/tile_size = 4.0
+shader_parameter/grid_n = 4.0
 shader_parameter/wet = 0.85
-shader_parameter/mud_amount = 1.0
-shader_parameter/patch_scale = 0.11
-shader_parameter/dirt_select = 3.0
-shader_parameter/clean_tile = Color(0.52, 0.51, 0.47, 1)
+shader_parameter/mud_amount = 0.6
+shader_parameter/macro_scale = 0.1
 shader_parameter/normal_scale = 1.0
 
 [node name="Zemin" type="MeshInstance3D" unique_id=1151462640]
