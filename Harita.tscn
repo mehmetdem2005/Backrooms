@@ -22,18 +22,18 @@ environment = SubResource("Environment_ueg10")
 
 [node name="TavanIsik1" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, 0)
-light_color = Color(1, 0.93, 0.78)
+light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 4.0
 omni_range = 9.0
 
 [node name="TavanIsik2" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, -6)
-light_color = Color(1, 0.93, 0.78)
+light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 4.0
 omni_range = 9.0
 
 [node name="TavanIsik3" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, -12)
-light_color = Color(1, 0.93, 0.78)
+light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 4.0
 omni_range = 9.0
