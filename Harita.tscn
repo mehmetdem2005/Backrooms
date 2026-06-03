@@ -2,10 +2,10 @@
 
 [sub_resource type="Environment" id="Environment_ueg10"]
 background_mode = 1
-background_color = Color(0.06, 0.06, 0.07, 1)
+background_color = Color(0.02, 0.02, 0.025, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.38, 0.39, 0.43, 1)
-ambient_light_energy = 0.65
+ambient_light_color = Color(0.1, 0.1, 0.13, 1)
+ambient_light_energy = 0.4
 tonemap_mode = 4
 
 [node name="Harita" type="Node3D" unique_id=48286236]
@@ -15,7 +15,25 @@ transform = Transform3D(0.9938837, -0.07311503, 0.08276059, 0, 0.7494289, 0.6620
 
 [node name="Isik" type="DirectionalLight3D" parent="." unique_id=1845520138]
 transform = Transform3D(0.81915206, -0.46984634, 0.32898995, 0, 0.57357645, 0.81915206, -0.57357645, -0.6710101, 0.46984634, 0, 0, 0)
-light_energy = 0.8
+light_energy = 0.3
 
 [node name="Ortam" type="WorldEnvironment" parent="." unique_id=1112891916]
 environment = SubResource("Environment_ueg10")
+
+[node name="TavanIsik1" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, 0)
+light_color = Color(1, 0.93, 0.78)
+light_energy = 4.0
+omni_range = 9.0
+
+[node name="TavanIsik2" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, -6)
+light_color = Color(1, 0.93, 0.78)
+light_energy = 4.0
+omni_range = 9.0
+
+[node name="TavanIsik3" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, -12)
+light_color = Color(1, 0.93, 0.78)
+light_energy = 4.0
+omni_range = 9.0
