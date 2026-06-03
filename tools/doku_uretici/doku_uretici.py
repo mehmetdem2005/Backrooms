@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
-"""Backrooms DOKU ÜRETİCİ
-=========================
-AI ile albedo üretir, ardından AO / normal / roughness / height PNG'lerini
-otomatik türetir. İsteğe bağlı olarak doğrudan bir Godot `parts/*.tscn` parçası
-yazıp Yerleştirici paletine hazır hale getirir.
+"""Backrooms DOKU ÜRETİCİ  (AI tabanlı, iki aşamalı)
+====================================================
+Akış senin istediğin gibi:
 
-Sağlayıcı (provider) seçilebilir:
+  1) AŞAMA 'albedo'   : AI YALNIZCA albedo (renk) üretir. Sen bakar, beğenirsin.
+  2) AŞAMA 'haritalar': Beğendiğin albedo'yu AI'ya geri verip diğer haritaları
+                        (normal / roughness / ao / height) ONA ürettirir.
+                        (Yerel/heuristik türetme varsayılan DEĞİL; istersen
+                         --harita-yontem yerel ile açılır.)
+
+Sağlayıcı (provider):
   nano-banana-pro   Google Gemini (Nano Banana Pro, 4K)   [GEMINI_API_KEY]
   nano-banana       Google Gemini (Nano Banana, hızlı)    [GEMINI_API_KEY]
   gpt-image         OpenAI GPT-image                       [OPENAI_API_KEY]
 
-Örnekler
---------
-# Üret + PBR + parça (kirli ıslak zemin):
-python doku_uretici.py --provider nano-banana-pro --ad kirli_fayans --tur zemin \
-    --prompt "dirty wet bathroom floor tiles, grime in grout, muddy" --seamless
+Örnek
+-----
+# 1) Önce sadece albedo:
+python doku_uretici.py --asama albedo --provider nano-banana-pro --ad kirli_fayans \
+    --prompt "dirty wet bathroom floor tiles, brown grime in grout, muddy patches" --seamless
 
-# Var olan bir albedo'dan SADECE PBR haritaları türet (AI çağrısı yok):
-python doku_uretici.py --girdi textures/floor_albedo.png --ad floor
+# (albedo'yu beğendin) 2) AI diğer haritaları üretsin + Godot parçası:
+python doku_uretici.py --asama haritalar --provider nano-banana-pro --ad kirli_fayans --tur zemin
 """
 from __future__ import annotations
 import argparse
@@ -26,13 +30,35 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import pbr  # noqa: E402
 
 SEAMLESS_EK = (", seamless tileable texture, no visible seams, flat even diffuse "
-			   "lighting, orthographic top-down, PBR albedo / base color only, no "
-			   "baked shadows, no highlights, ultra detailed, high resolution")
+			   "lighting, orthographic top-down, base color / albedo only, no baked "
+			   "shadows, no highlights, ultra detailed, high resolution")
 
-# tur -> (BoxMesh boyutu, kategori notu)
+# AI'ya her harita için ne ürettireceğini anlatan yönergeler. Albedo referans
+# görsel olarak verilir; bu sayede hizalama (aynı düzen) korunur.
+HARITA_PROMPTLARI = {
+	"normal": (
+		"Generate the TANGENT-SPACE NORMAL MAP of this exact texture. Output a "
+		"blue/purple normal map, OpenGL convention (+Y up), encoding the surface "
+		"relief of THIS image with identical layout, scale and alignment. Flat "
+		"areas must be the neutral blue (128,128,255). Seamless and tileable. "
+		"Output ONLY the normal map image, nothing else."),
+	"roughness": (
+		"Generate the grayscale ROUGHNESS MAP of this exact texture. White = rough "
+		"/ matte, black = smooth / glossy (wet). Same layout, scale and alignment. "
+		"Seamless and tileable. Output ONLY the grayscale map."),
+	"ao": (
+		"Generate the grayscale AMBIENT OCCLUSION (AO) MAP of this exact texture. "
+		"White = exposed surface, dark gray = crevices, grout lines and contact "
+		"shadows. Same layout and alignment. Seamless and tileable. Output ONLY "
+		"the grayscale map."),
+	"height": (
+		"Generate the grayscale HEIGHT / DISPLACEMENT MAP of this exact texture. "
+		"White = highest, black = lowest. Same layout and alignment. Seamless and "
+		"tileable. Output ONLY the grayscale map."),
+}
+
 PARCA_BOYUT = {
 	"zemin": (4.0, 0.12, 4.0),
 	"tavan": (4.0, 0.12, 4.0),
@@ -45,19 +71,17 @@ def _ms(x: float) -> str:
 
 
 def parca_tscn_yaz(parca_yol: str, ad: str, tur: str, doku_yollari: dict) -> None:
-	"""Godot 4 uyumlu parts/<ad>.tscn üretir (BoxMesh + StandardMaterial3D)."""
+	"""Godot 4 uyumlu parts/<ad>.tscn (BoxMesh + StandardMaterial3D)."""
 	sx, sy, sz = PARCA_BOYUT[tur]
-	# res:// göreli yollar
+
 	def res(p):
 		p = p.replace("\\", "/")
 		i = p.find("textures/")
 		return "res://" + p[i:] if i >= 0 else "res://" + os.path.basename(p)
 
-	ext = []
-	id_map = {}
-	sira = 1
+	ext, id_map, sira = [], {}, 1
 	for anahtar in ("albedo", "roughness", "normal", "ao"):
-		if anahtar in doku_yollari:
+		if anahtar in doku_yollari and os.path.exists(doku_yollari[anahtar]):
 			rid = f"{sira}_{anahtar}"
 			id_map[anahtar] = rid
 			ext.append(f'[ext_resource type="Texture2D" path="{res(doku_yollari[anahtar])}" id="{rid}"]')
@@ -89,75 +113,97 @@ def parca_tscn_yaz(parca_yol: str, ad: str, tur: str, doku_yollari: dict) -> Non
 		f.write(govde)
 
 
-def main() -> int:
-	ap = argparse.ArgumentParser(description="Backrooms doku üretici (AI + PBR).")
-	ap.add_argument("--ad", required=True, help="Çıktı dosya tabanı (ör. kirli_fayans)")
-	ap.add_argument("--provider", choices=list(__import__("saglayicilar").VARSAYILAN_MODELLER),
-					help="Görsel sağlayıcı. --girdi verilirse gerekmez.")
-	ap.add_argument("--prompt", help="Üretim metni (provider ile birlikte)")
-	ap.add_argument("--girdi", help="AI yerine var olan albedo PNG'sinden başla (sadece PBR)")
-	ap.add_argument("--model", help="Model kimliğini elle ver (varsayılanı ezer)")
-	ap.add_argument("--referans", nargs="*", default=[], help="Stil için referans görseller")
-	ap.add_argument("--seamless", action="store_true", help="Prompt'a dikişsiz/tileable yönergesi ekle")
-	ap.add_argument("--boyut", type=int, default=1024, help="Albedo kenar pikseli (varsayılan 1024)")
-	ap.add_argument("--cikti", default="textures", help="Doku çıktı klasörü (varsayılan textures/)")
-	ap.add_argument("--tur", choices=list(PARCA_BOYUT), help="Verilirse parts/<ad>.tscn de yazılır")
-	ap.add_argument("--parts", default="parts", help="Parça klasörü (varsayılan parts/)")
-	ap.add_argument("--no-pbr", action="store_true", help="Sadece albedo (harita türetme)")
-	ap.add_argument("--no-tileable", action="store_true", help="Haritaları sarmadan (wrap) üret")
-	ap.add_argument("--normal-guc", type=float, default=2.5)
-	ap.add_argument("--rough-min", type=float, default=0.3)
-	ap.add_argument("--rough-max", type=float, default=0.92)
-	ap.add_argument("--api-key", help="API anahtarını elle ver (ortam değişkeni yerine)")
-	args = ap.parse_args()
-
+def _kaydet_gorsel(ham_bytes, yol, boyut, gri=False):
 	from PIL import Image
+	img = Image.open(io.BytesIO(ham_bytes)).convert("RGB")
+	if boyut:
+		img = img.resize((boyut, boyut), Image.LANCZOS)
+	if gri:
+		img = img.convert("L")
+	img.save(yol)
+
+
+def asama_albedo(args) -> str:
+	import saglayicilar
 	os.makedirs(args.cikti, exist_ok=True)
 	albedo_yol = os.path.join(args.cikti, f"{args.ad}_albedo.png")
+	prompt = args.prompt + (SEAMLESS_EK if args.seamless else "")
+	print(f"• Albedo üretiliyor [{args.provider}] …")
+	sag = saglayicilar.fabrika(args.provider, args.model, args.api_key)
+	ham = sag.uret(prompt, args.boyut, args.referans or None)
+	_kaydet_gorsel(ham, albedo_yol, args.boyut)
+	print(f"✓ Albedo: {albedo_yol}")
+	print(f"\nBeğendiysen diğer haritaları AI'ya ürettir:\n"
+		  f"  python {os.path.basename(__file__)} --asama haritalar "
+		  f"--provider {args.provider} --ad {args.ad}"
+		  + (f" --tur {args.tur}" if args.tur else " --tur zemin"))
+	return albedo_yol
 
-	# 1) Albedo: ya AI üret ya da var olandan al
-	if args.girdi:
-		img = Image.open(args.girdi).convert("RGB")
-		if args.boyut and img.size != (args.boyut, args.boyut):
-			img = img.resize((args.boyut, args.boyut), Image.LANCZOS)
-		img.save(albedo_yol)
-		print(f"• Albedo (girdiden): {albedo_yol}")
-	else:
-		if not args.provider or not args.prompt:
-			ap.error("AI üretimi için --provider ve --prompt gerekli (ya da --girdi ver).")
-		import saglayicilar
-		prompt = args.prompt + (SEAMLESS_EK if args.seamless else "")
-		print(f"• Üretiliyor [{args.provider}] …")
-		sag = saglayicilar.fabrika(args.provider, args.model, args.api_key)
-		ham = sag.uret(prompt, args.boyut, args.referans or None)
-		img = Image.open(io.BytesIO(ham)).convert("RGB")
-		if args.boyut:
-			img = img.resize((args.boyut, args.boyut), Image.LANCZOS)
-		img.save(albedo_yol)
-		print(f"• Albedo: {albedo_yol}")
 
+def asama_haritalar(args) -> None:
+	albedo_yol = os.path.join(args.cikti, f"{args.ad}_albedo.png")
+	if not os.path.exists(albedo_yol):
+		raise SystemExit(f"Albedo yok: {albedo_yol}\nÖnce: --asama albedo")
 	dokular = {"albedo": albedo_yol}
 
-	# 2) PBR haritaları
-	if not args.no_pbr:
+	if args.harita_yontem == "yerel":
+		import pbr
 		taban = os.path.join(args.cikti, args.ad)
-		harita = pbr.uret_haritalar(
-			albedo_yol, taban,
-			tileable=not args.no_tileable,
-			normal_guc=args.normal_guc,
-			rough_min=args.rough_min, rough_max=args.rough_max,
-		)
-		dokular.update(harita)
-		for k, v in harita.items():
-			print(f"• {k:9s}: {v}")
+		dokular.update(pbr.uret_haritalar(
+			albedo_yol, taban, tileable=not args.no_tileable))
+		for k, v in dokular.items():
+			if k != "albedo":
+				print(f"• {k:9s}: {v}  (yerel/heuristik)")
+	else:
+		import saglayicilar
+		sag = saglayicilar.fabrika(args.provider, args.model, args.api_key)
+		for tip in args.harita:
+			yol = os.path.join(args.cikti, f"{args.ad}_{tip}.png")
+			print(f"• {tip} üretiliyor (AI, albedo referanslı) …")
+			ham = sag.uret(HARITA_PROMPTLARI[tip], args.boyut, [albedo_yol])
+			_kaydet_gorsel(ham, yol, args.boyut, gri=(tip != "normal"))
+			dokular[tip] = yol
+			print(f"  ✓ {yol}")
 
-	# 3) İsteğe bağlı Godot parçası
 	if args.tur:
 		parca_yol = os.path.join(args.parts, f"{args.ad}.tscn")
 		parca_tscn_yaz(parca_yol, args.ad, args.tur, dokular)
 		print(f"• Godot parçası: {parca_yol}  → Yerleştirici'de 🔄 Yenile")
-
 	print("✓ Bitti.")
+
+
+def main() -> int:
+	import saglayicilar
+	ap = argparse.ArgumentParser(description="Backrooms doku üretici (AI, iki aşamalı).")
+	ap.add_argument("--asama", choices=["albedo", "haritalar", "hepsi"], default="albedo",
+					help="albedo: yalnız renk · haritalar: AI diğer haritaları · hepsi: ikisi")
+	ap.add_argument("--ad", required=True, help="Çıktı dosya tabanı (ör. kirli_fayans)")
+	ap.add_argument("--provider", choices=list(saglayicilar.VARSAYILAN_MODELLER),
+					help="Görsel sağlayıcı")
+	ap.add_argument("--prompt", help="Albedo üretim metni ('albedo'/'hepsi' için)")
+	ap.add_argument("--model", help="Model kimliğini elle ver")
+	ap.add_argument("--referans", nargs="*", default=[], help="Albedo için stil referansları")
+	ap.add_argument("--seamless", action="store_true", help="Albedo'ya dikişsiz/tileable yönergesi ekle")
+	ap.add_argument("--harita", nargs="*", default=["normal", "roughness", "ao"],
+					choices=list(HARITA_PROMPTLARI), help="AI'ya ürettirilecek haritalar")
+	ap.add_argument("--harita-yontem", choices=["ai", "yerel"], default="ai",
+					help="ai: haritaları AI üretir (varsayılan) · yerel: numpy heuristik")
+	ap.add_argument("--boyut", type=int, default=1024, help="Kenar pikseli (varsayılan 1024)")
+	ap.add_argument("--cikti", default="textures", help="Doku klasörü (varsayılan textures/)")
+	ap.add_argument("--tur", choices=list(PARCA_BOYUT), help="Verilirse parts/<ad>.tscn yazılır")
+	ap.add_argument("--parts", default="parts", help="Parça klasörü")
+	ap.add_argument("--no-tileable", action="store_true", help="(yerel) haritaları sarmadan üret")
+	ap.add_argument("--api-key", help="API anahtarını elle ver")
+	args = ap.parse_args()
+
+	if args.asama in ("albedo", "hepsi"):
+		if not args.provider or not args.prompt:
+			ap.error("'albedo'/'hepsi' için --provider ve --prompt gerekli.")
+		asama_albedo(args)
+	if args.asama in ("haritalar", "hepsi"):
+		if args.harita_yontem == "ai" and not args.provider:
+			ap.error("'haritalar' (AI) için --provider gerekli.")
+		asama_haritalar(args)
 	return 0
 
 

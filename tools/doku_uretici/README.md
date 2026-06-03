@@ -37,43 +37,47 @@ pip install -r requirements.txt   # sadece kullanacağın provider'ın SDK'sı �
    export OPENAI_API_KEY="sk-..."
    ```
 
-## Kullanım
+## Kullanım — iki aşamalı (önce albedo, beğenince devamı)
 
 ```bash
-# Üret + PBR + Godot parçası (kirli ıslak zemin):
-python doku_uretici.py --provider nano-banana-pro --ad kirli_fayans --tur zemin \
+# 1) ÖNCE SADECE ALBEDO — bak, beğen:
+python doku_uretici.py --asama albedo --provider nano-banana-pro --ad kirli_fayans \
     --prompt "dirty wet bathroom floor tiles, brown grime in the grout, muddy patches" \
     --seamless
 
-# Stil tutarlılığı için referans görselle:
-python doku_uretici.py --provider nano-banana-pro --ad pis_duvar --tur duvar \
-    --prompt "grimy stained wall tiles, water streaks" --seamless \
-    --referans textures/gray_tile_wall_clean_albedo.png
+# 2) BEĞENDİYSEN — diğer haritaları AI ürretsin + Godot parçası:
+python doku_uretici.py --asama haritalar --provider nano-banana-pro --ad kirli_fayans --tur zemin
 
-# AI YOK — var olan bir albedo'dan sadece PBR haritaları:
-python doku_uretici.py --girdi textures/floor_albedo.png --ad floor
+# (İstersen tek seferde ikisi):
+python doku_uretici.py --asama hepsi --provider nano-banana-pro --ad kirli_fayans --tur zemin \
+    --prompt "..." --seamless
 ```
 
-Çıktılar `textures/<ad>_albedo|normal|roughness|ao|height.png`. `--tur` verirsen
-`parts/<ad>.tscn` de yazılır → Godot'ta Yerleştirici panelinde **🔄 Yenile**.
+1. aşama `textures/kirli_fayans_albedo.png` üretir.
+2. aşama beğendiğin albedo'yu **AI'ya referans verip** `_normal/_roughness/_ao` haritalarını
+   **AI'ya** ürettirir (aynı hizada, tileable) ve `--tur` ile `parts/<ad>.tscn` yazar →
+   Godot'ta Yerleştirici'de **🔄 Yenile**.
 
 ## Önemli bayraklar
 | Bayrak | İş |
 |---|---|
+| `--asama` | `albedo` (yalnız renk) · `haritalar` (AI diğer haritalar) · `hepsi` |
 | `--provider` | `nano-banana-pro` / `nano-banana` / `gpt-image` |
-| `--prompt` | Üretim metni |
-| `--seamless` | Prompt'a dikişsiz/tileable + düz ışık yönergesi ekler |
-| `--girdi <png>` | AI yerine var olan albedo'dan başla (yalnız PBR) |
+| `--prompt` | Albedo üretim metni |
+| `--seamless` | Albedo'ya dikişsiz/tileable + düz ışık yönergesi ekler |
+| `--harita` | AI'ya ürettirilecek haritalar (vars. `normal roughness ao`) |
+| `--harita-yontem` | `ai` (varsayılan) · `yerel` (numpy heuristik, ücretsiz/offline) |
 | `--tur` | `zemin` / `duvar` / `tavan` → `parts/.tscn` yazar |
-| `--referans …` | Stil için referans görseller (few-shot) |
-| `--boyut` | Albedo kenar pikseli (varsayılan 1024) |
+| `--referans …` | Albedo için stil referansları (few-shot) |
+| `--boyut` | Kenar pikseli (varsayılan 1024) |
 | `--model` | Model kimliğini elle ezer |
-| `--normal-guc`, `--rough-min`, `--rough-max` | PBR ince ayar |
-| `--no-pbr`, `--no-tileable` | Harita türetmeyi / sarmayı kapat |
 
-## Notlar
-- **Tileable** üretirken prompt'a mutlaka dikişsizlik iste (`--seamless`). Türetilen
-  haritalar zaten kenarlarda sarılarak (wrap) hesaplandığı için dikişsiz döşenir.
-- PBR haritaları tek albedo'dan **yaklaşık** türetilir; foto-gerçek PBR taraması
-  değildir ama stilize Backrooms yüzeyleri için fazlasıyla yeterlidir.
+## Dürüst notlar
+- **Haritaları artık AI üretiyor** (varsayılan). Görsel modeller gerçek bir normal-map
+  *hesaplamaz*; albedo'ya bakıp normal-map'e **benzeyen** bir görsel boyar — yani bu da
+  yaklaşıktır, ama modelin malzeme bilgisi sayesinde basit parlaklık türetmesinden
+  genelde daha tutarlıdır. Sonucu **sen onaylarsın** (önce albedo, sonra haritalar).
+- `--harita-yontem yerel`: API harcamadan, numpy ile **heuristik** türetme (parlaklık→
+  kabartma). Hızlı/bedava ama renk≠derinlik olan yerlerde sahte kabartma yapar.
+- **Tileable**: albedo için mutlaka `--seamless` kullan.
 - Maliyet: birkaç doku = sentler. $300 kredi bu iş için kat kat fazlasıyla yeter.
