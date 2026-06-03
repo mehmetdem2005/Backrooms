@@ -1,0 +1,7 @@
+# Çekirdek (PBR harita üretimi — AI olmadan da çalışır)
+numpy>=1.24
+Pillow>=10.0
+
+# Sağlayıcılar (yalnızca kullanacağın provider için gerekli)
+google-genai>=0.3      # nano-banana / nano-banana-pro (Google Gemini)
+openai>=1.40           # gpt-image (OpenAI)
