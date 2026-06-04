@@ -13,6 +13,11 @@ J=json.load(open(os.path.join(PROJE,"tools","dunya_uretici","dunya_plan.json")))
 TEX=os.path.join(PROJE,"textures")
 PM=J["parts_meta"]; WALL_H=J["wall_h"]
 
+import sys
+secim = sys.argv[-1] if "--" in sys.argv else "hepsi"
+def istendi(ad): return secim=="hepsi" or ad in secim
+DOLLHOUSE = (secim=="izometrik")   # genel bakis: tavansiz kesit + tepe gunesi
+
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc=bpy.context.scene
 coll=bpy.context.collection
@@ -104,6 +109,7 @@ def glb_yerlestir(path,pos,rot,yoff,extra=1.0):
 # ================================================================ DUNYAYI KUR
 for it in J["instances"]:
     part=it["part"]; meta=PM[part]; k=meta["kind"]
+    if k=="ceil" and DOLLHOUSE: continue            # dollhouse: tavani atla
     if k in ("floor","wall","ceil"): kutu(part,it["pos"],it["rot"],it["scale"])
     elif k=="glb": glb_yerlestir(meta["glb"],it["pos"],it["rot"],meta.get("yoff",0.0))
     elif k=="door":
@@ -139,9 +145,11 @@ def kamera(loc,hedef,lens=35):
 
 def render(tag): sc.render.filepath=tag; bpy.ops.render.render(write_still=True); print(">>>",tag)
 
-import sys
-secim = sys.argv[-1] if "--" in sys.argv else "hepsi"
-def istendi(ad): return secim=="hepsi" or ad in secim
+if DOLLHOUSE:
+    gun=bpy.data.lights.new("gun",'SUN'); gun.energy=2.5; gun.angle=0.1
+    go=bpy.data.objects.new("gun",gun); go.rotation_euler=(math.radians(52),math.radians(12),math.radians(28))
+    coll.objects.link(go)
+    w.node_tree.nodes["Background"].inputs[1].default_value=0.5
 
 if istendi("lobi"):
     kamera(g2b((2.5,1.7,0)), g2b((26,1.45,0)), 26); render("/tmp/dunya_lobi.png")
