@@ -1,0 +1,47 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://fcbec0om78o" path="res://models/kapi_cerceve.glb" id="1_cer"]
+[ext_resource type="PackedScene" uid="uid://c7bvuim470orv" path="res://models/kapi_kanat.glb" id="2_kan"]
+[ext_resource type="Script" path="res://parts/kapi.gd" id="3_scr"]
+
+[sub_resource type="BoxShape3D" id="Shape_sol"]
+size = Vector3(0.13, 2.1, 0.16)
+
+[sub_resource type="BoxShape3D" id="Shape_sag"]
+size = Vector3(0.13, 2.1, 0.16)
+
+[sub_resource type="BoxShape3D" id="Shape_ust"]
+size = Vector3(0.84, 0.32, 0.16)
+
+[sub_resource type="BoxShape3D" id="Shape_kanat"]
+size = Vector3(0.81, 1.62, 0.085)
+
+[node name="Kapi" type="Node3D"]
+script = ExtResource("3_scr")
+
+[node name="Cerceve" parent="." instance=ExtResource("1_cer")]
+
+[node name="CerceveGovde" type="StaticBody3D" parent="."]
+
+[node name="SolSove" type="CollisionShape3D" parent="CerceveGovde"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.485, 1.05, -0.08)
+shape = SubResource("Shape_sol")
+
+[node name="SagSove" type="CollisionShape3D" parent="CerceveGovde"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.485, 1.05, -0.08)
+shape = SubResource("Shape_sag")
+
+[node name="UstKiris" type="CollisionShape3D" parent="CerceveGovde"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.94, -0.08)
+shape = SubResource("Shape_ust")
+
+[node name="Mente" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.405, 0, -0.0725)
+
+[node name="Kanat" parent="Mente" instance=ExtResource("2_kan")]
+
+[node name="KanatGovde" type="StaticBody3D" parent="Mente"]
+
+[node name="KanatCarpisma" type="CollisionShape3D" parent="Mente/KanatGovde"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.405, 0.955, 0)
+shape = SubResource("Shape_kanat")
