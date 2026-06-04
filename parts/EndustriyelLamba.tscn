@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+; Yerlestirilebilir prop: endustriyel tavan lambasi (Tripo GLB, doku korunur).
+; Model tabani y=0'a hizalandi; tavana tasima ([ ] tuslari / gizmo) ile ayarlanir.
+
+[ext_resource type="PackedScene" uid="uid://b85bd7ccp36ac" path="res://models/endustriyel_lamba.glb" id="1_l"]
+
+[node name="EndustriyelLamba" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_l")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.082, 0)

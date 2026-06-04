@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+; Yerlestirilebilir prop: pasli cop kutusu (Tripo GLB, doku korunur).
+; Model tabani y=0'a hizalandi (zemine oturur); konum/yon/olcek gizmo ile ayarlanir.
+
+[ext_resource type="PackedScene" uid="uid://cg3ctdtgr5ojk" path="res://models/cop_kutusu.glb" id="1_c"]
+
+[node name="CopKutusu" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.49, 0)

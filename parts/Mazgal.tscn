@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+; Yerlestirilebilir prop: drenaj mazgali (Tripo GLB, doku korunur).
+; Model tabani y=0'a hizalandi (zemine oturur); konum/yon/olcek gizmo ile ayarlanir.
+
+[ext_resource type="PackedScene" uid="uid://d2m644vxg87vb" path="res://models/mazgal.glb" id="1_m"]
+
+[node name="Mazgal" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.239, 0)

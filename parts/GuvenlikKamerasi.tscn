@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+; Yerlestirilebilir prop: guvenlik kamerasi (Tripo GLB, doku korunur).
+; Model tabani y=0'a hizalandi; duvara/yuksege tasima ve aci gizmo ile ayarlanir.
+
+[ext_resource type="PackedScene" uid="uid://dar8717vsn5s0" path="res://models/guvenlik_kamerasi.glb" id="1_k"]
+
+[node name="GuvenlikKamerasi" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.415, 0)
