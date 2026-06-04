@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+; Yerlestirilebilir + animasyonlu canavar (alien yaratik, Tripo GLB).
+; Dokular 4K -> 1024 kuculdu (60.9MB -> 10.5MB); mesh/iskelet/11 animasyon KORUNDU.
+; Tabani y=0 (zemine oturur); yerlestirici eklentisi otomatik listeler, gizmo ile ayarlanir.
+
+[ext_resource type="PackedScene" uid="uid://sma5ybmyxk4a" path="res://models/canavar.glb" id="1_cv"]
+[ext_resource type="Script" path="res://parts/canavar.gd" id="2_scr"]
+
+[node name="Canavar" type="Node3D"]
+script = ExtResource("2_scr")
+
+[node name="Model" parent="." instance=ExtResource("1_cv")]
+transform = Transform3D(2.2, 0, 0, 0, 2.2, 0, 0, 0, 2.2, 0, 0, 0)
