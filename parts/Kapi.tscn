@@ -23,7 +23,7 @@ size = Vector3(1.0359, 0.196, 0.2331)
 size = Vector3(1.0359, 0.0335, 0.2331)
 
 [sub_resource type="BoxShape3D" id="Shape_kanat"]
-size = Vector3(1.0159, 1.7505, 0.1)
+size = Vector3(1.0159, 1.7505, 0.1931)
 
 [node name="Kapi" type="Node3D"]
 script = ExtResource("3_scr")
@@ -54,7 +54,7 @@ shape = SubResource("Shape_alt")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5038, 0.0435, 0)
 
 [node name="Kanat" parent="Mente" instance=ExtResource("2_kan")]
-transform = Transform3D(0, 0, 1.90853, 0, 1.75051, 0, -0.461814, 0, 0, -0.5079, 0.8753, 0)
+transform = Transform3D(0, 0, 1.90853, 0, 1.75051, 0, -0.89159, 0, 0, -0.5079, 0.8753, 0)
 
 [node name="KanatGovde" type="AnimatableBody3D" parent="Mente"]
 

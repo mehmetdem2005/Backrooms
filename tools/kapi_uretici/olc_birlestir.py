@@ -22,7 +22,7 @@ PANEL = os.path.join(PROJE, "models", "kapi_kanat_tripo.glb")
 
 TARGET_BOY = 2.0       # kapi yuksekligi (m) - kullanici karari
 CLR        = 0.01      # panel ile aciklik arasi bosluk (her kenar, m)
-PANEL_DERINLIK = 0.10  # panel son derinligi (m); cerceve derinligi icinde otursun
+DERIN_REVEAL = 0.02    # panel ile cerceve yuzu arasi geri cekme (her yuz, m)
 HINGE_SIDE = "sag"     # mentese kenari: "sag" (kapi kolu solda -> mentese sagda) / "sol"
 
 # ---------------------------------------------------------------- GLB decode
@@ -122,7 +122,7 @@ pD = pmx[2]-pmn[2]   # Tripo-X -> oyun Z (derinlik)
 
 panel_en  = ac_en  - 2*CLR
 panel_boy = ac_boy - 2*CLR
-panel_der = PANEL_DERINLIK
+panel_der = D - 2*DERIN_REVEAL    # panel cerceve derinligini doldurur (ortali, ince reveal)
 # LOKAL olcekler (Tripo eksenlerine): height=Y, width=Z, depth=X
 sY = panel_boy / pH      # yukseklik
 sZ = panel_en  / pW      # genislik
