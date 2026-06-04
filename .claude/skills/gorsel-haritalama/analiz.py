@@ -299,6 +299,18 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
 
     rect, M, (Wt, Ht) = rectify(img, kose, en, boy)
     cv2.imwrite(os.path.join(cikti, "rectified_temiz.png"), rect)
+    # genel model insasi icin: rectified siluet maskesi
+    maske_r = cv2.warpPerspective(mask, M, (Wt, Ht))
+    maske_r = (maske_r > 127).astype(np.uint8) * 255
+    cv2.imwrite(os.path.join(cikti, "mask_rectified.png"), maske_r)
+    # genel (deterministik) model insasi icin dis hat [0..1]
+    mc, _ = cv2.findContours(maske_r, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if mc:
+        oc = max(mc, key=cv2.contourArea)
+        oc = cv2.approxPolyDP(oc, 0.004 * cv2.arcLength(oc, True), True).reshape(-1, 2)
+        outline = [[round(float(x)/Wt, 5), round(float(y)/Ht, 5)] for x, y in oc]
+        with open(os.path.join(cikti, "outline.json"), "w") as f:
+            json.dump({"outline_normalize": outline, "rectified_boyut": [Wt, Ht]}, f, indent=1)
 
     # siluet noktalarini rectified uzaya tasi (ust pah olcumu icin)
     sil = cv2.approxPolyDP(cnt, 0.015 * cv2.arcLength(cnt, True), True).reshape(-1, 2)
