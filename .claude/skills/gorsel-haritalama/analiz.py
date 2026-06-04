@@ -136,14 +136,114 @@ def kamera_poz(kose, en, boy, W, H):
     p0, _ = cv2.projectPoints(np.array([[0, boy/2, 0]], np.float32), rvec, tvec, K, None)
     p1, _ = cv2.projectPoints(np.array([[0.1, boy/2, 0]], np.float32), rvec, tvec, K, None)
     ppm = float(np.linalg.norm(p1 - p0) / 0.1)
+    # px_per_m yatay (en yonu) - yan serit -> kalinlik icin
+    q0, _ = cv2.projectPoints(np.array([[en/2, boy/2, 0]], np.float32), rvec, tvec, K, None)
+    q1, _ = cv2.projectPoints(np.array([[en/2+0.1, boy/2, 0]], np.float32), rvec, tvec, K, None)
+    ppm_yatay = float(np.linalg.norm(q1 - q0) / 0.1)
     return {
         "focal": round(f, 1),
         "mesafe_m": round(float(np.linalg.norm(tvec)), 3),
         "yaw_deg": round(float(np.degrees(np.arctan2(nrm[0], nrm[2]))), 2),
         "pitch_deg": round(float(np.degrees(np.arctan2(nrm[1], nrm[2]))), 2),
         "px_per_m_sol": round(ppm, 1),
-        "not_derinlik": "yan-serit_px / px_per_m_sol ~ derinlik*sin(yaw); sol kenardan olc",
+        "px_per_m_yatay": round(ppm_yatay, 1),
+        "not_derinlik": "yan-serit_px / px_per_m_yatay / sin(yaw) ~ kalinlik(m)",
     }
+
+
+# ---------------------------------------------------- GERCEK KALINLIK (3/4 yan yuz)
+def olc_kalinlik(mask, kose, kam):
+    """3/4 gorunumde gorunen YAN YUZ seritinden gercek kalinligi (derinlik) olc.
+    Front-yuz kenari ile siluet ucu farki = yan serit_px;
+    kalinlik = serit_px / (px_per_m_yatay * sin|yaw|).  Genel, objeden bagimsiz."""
+    if not kam or "yaw_deg" not in kam:
+        return None
+    import math as _m
+    yaw = _m.radians(abs(kam.get("yaw_deg", 0.0)))
+    pitch = _m.radians(abs(kam.get("pitch_deg", 0.0)))
+    ppmx = kam.get("px_per_m_yatay") or kam.get("px_per_m_sol") or 0
+    ppmy = kam.get("px_per_m_sol") or 0
+    H, W = mask.shape
+    tl, tr, br, bl = [np.asarray(p, float) for p in kose]
+
+    def dik_serit(p_top, p_bot, yon):
+        z0, z1 = int(min(p_top[1], p_bot[1])), int(max(p_top[1], p_bot[1]))
+        ws = []
+        for y in range(max(0, z0+6), min(H, z1-6)):
+            xs = np.where(mask[y] > 127)[0]
+            if len(xs) < 2:
+                continue
+            t = (y - p_top[1]) / ((p_bot[1] - p_top[1]) or 1)
+            fx = p_top[0] + t*(p_bot[0]-p_top[0])
+            w = (xs.max()-fx) if yon > 0 else (fx-xs.min())
+            if 0 < w < W*0.4:
+                ws.append(w)
+        return float(np.median(ws)) if ws else 0.0
+
+    def yat_serit(p_l, p_r, yon):
+        x0, x1 = int(min(p_l[0], p_r[0])), int(max(p_l[0], p_r[0]))
+        ws = []
+        for x in range(max(0, x0+6), min(W, x1-6)):
+            ys = np.where(mask[:, x] > 127)[0]
+            if len(ys) < 2:
+                continue
+            t = (x - p_l[0]) / ((p_r[0]-p_l[0]) or 1)
+            fy = p_l[1] + t*(p_r[1]-p_l[1])
+            w = (ys.max()-fy) if yon > 0 else (fy-ys.min())
+            if 0 < w < H*0.4:
+                ws.append(w)
+        return float(np.median(ws)) if ws else 0.0
+
+    aday = []
+    if ppmx > 0 and _m.sin(yaw) > 0.05:
+        s = max(dik_serit(tr, br, +1), dik_serit(tl, bl, -1))   # sag/sol yan
+        if s > 1:
+            aday.append(s / (ppmx * _m.sin(yaw)))
+    if ppmy > 0 and _m.sin(pitch) > 0.05:
+        s = max(yat_serit(bl, br, +1), yat_serit(tl, tr, -1))   # alt/ust yan
+        if s > 1:
+            aday.append(s / (ppmy * _m.sin(pitch)))
+    if not aday:
+        return None
+    return round(float(np.median(aday)), 4)
+
+
+# ---------------------------------------------------- KABARTMA YONU + GORELI DERINLIK
+def derinlik_isaret(gray, x0, y0, x1, y1):
+    """Bir ogenin GIRINTI/KABARIK/DUZ oldugunu ve goreli derinligini golgeden
+    oku (rectified on yuz). Iki ipucu (genel, objeden bagimsiz):
+      1) ic vs cevre parlaklik farki: koyu ic => GIRINTI (golge dolu).
+      2) DIS kenar golge asimetrisi: bir disar kenar otekinden cok koyu =>
+         oge KABARIK ve isiktan kacan yone golge dusuruyor (kabarik ipucu;
+         kabarik yuzeyin parlakligi cevreyle ayni oldugunda da yakalar).
+    Doner: (isaret, guc[0..1])."""
+    H, W = gray.shape
+    px0, py0, px1, py1 = int(x0*W), int(y0*H), int(x1*W), int(y1*H)
+    pad = max(2, int(0.012*min(W, H)))
+    ic = gray[py0+pad:py1-pad, px0+pad:px1-pad]
+    ox0, oy0 = max(0, px0-3*pad), max(0, py0-3*pad)
+    ox1, oy1 = min(W, px1+3*pad), min(H, py1+3*pad)
+    ring = gray[oy0:oy1, ox0:ox1].astype(np.float32).copy()
+    ring[py0-oy0:py1-oy0, px0-ox0:px1-ox0] = np.nan
+    if ic.size == 0 or np.all(np.isnan(ring)):
+        return "duz", 0.0
+    diff = float(ic.mean()) - float(np.nanmean(ring))
+    # dis kenar bantlari (golge asimetrisi)
+    b = max(2, pad)
+    def m(a): return float(np.mean(a)) if a.size else np.nan
+    sol = m(gray[py0:py1, max(0, px0-b):px0])
+    sag = m(gray[py0:py1, px1:min(W, px1+b)])
+    ust = m(gray[max(0, py0-b):py0, px0:px1])
+    alt = m(gray[py1:min(H, py1+b), px0:px1])
+    vals = [v for v in (sol, sag, ust, alt) if not np.isnan(v)]
+    asym = (max(vals) - min(vals)) if len(vals) >= 2 else 0.0
+    if diff < -6:                       # ic koyu -> girinti
+        return "girinti", round(min(1.0, abs(diff)/55.0), 3)
+    if diff > 6:                        # ic parlak -> kabarik
+        return "kabarik", round(min(1.0, abs(diff)/55.0), 3)
+    if asym > 12:                       # ic~cevre ama dis golge asimetrik -> kabarik
+        return "kabarik", round(min(1.0, asym/60.0), 3)
+    return "duz", round(min(1.0, abs(diff)/55.0), 3)
 
 
 def rectify(img, kose, en, boy):
@@ -503,6 +603,10 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
     # ALT-PIKSEL kesinlestirme (SAM kaba kutu -> gradyan kenari)
     gray = cv2.GaussianBlur(cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY), (3, 3), 0).astype(np.float32)
     gray8 = cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY)
+    gray_d = cv2.GaussianBlur(gray8, (5, 5), 0).astype(np.float32)  # kabartma okumasi
+    # DERINLIK: kamera + gercek kalinlik (3/4 yan yuz)
+    kam = kamera_poz(kose, en, boy, W, H)
+    kalinlik = olc_kalinlik(mask, kose, kam)
     ogeler = []
     for a, x0, y0, x1, y1 in sorted(feats, key=lambda f: f[2]):
         try:
@@ -522,9 +626,22 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
         }
         if et == "vent":
             d["izgara_sayisi"] = int(vent_izgara(gray, x0, y0, x1, y1))
+        # DERINLIK ALGISI: girinti/kabarik yonu + goreli derinlik (golgeden)
+        isaret, guc = derinlik_isaret(gray_d, x0, y0, x1, y1)
+        d["kabartma"] = isaret
+        d["derinlik_orani"] = guc
+        if kalinlik:
+            kat = 0.55 if isaret == "girinti" else 0.40 if isaret == "kabarik" else 0.15
+            d["derinlik_m"] = round(guc * kalinlik * kat + 0.04 * kalinlik, 4)
         # IC-ICE alt-ogeler (kabarik cubuk / cep / alt-cerceve)
         alt = alt_ogeler(rect, x0, y0, x1, y1)
         if alt:
+            for al in alt:
+                ai, ag = derinlik_isaret(gray_d, al["x"], al["y"], al["x1"], al["y1"])
+                al["kabartma"] = ai
+                if kalinlik:
+                    kk = 0.40 if ai == "kabarik" else 0.50 if ai == "girinti" else 0.15
+                    al["derinlik_m"] = round(ag * kalinlik * kk + 0.03 * kalinlik, 4)
             d["alt_ogeler"] = alt
         # her ogenin civatalarini bolgesel olarak ara
         cv = tespit_civata(gray8, max(0, x0-0.02), max(0, y0-0.02),
@@ -551,9 +668,17 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
         "siluet_rectified_normalize": sil_n,
         "ic_ogeler": ogeler,
         "civatalar_global": civatalar,
-        "kamera": kamera_poz(kose, en, boy, W, H),
+        "kamera": kam,
+        "derinlik": {
+            "kalinlik_m": kalinlik,
+            "kalinlik_orani": round(kalinlik/boy, 4) if kalinlik else None,
+            "yontem": "3/4 yan-yuz serit / (px_per_m_yatay*sin(yaw)); kabartma=golge",
+            "not": "ic_ogeler[].kabartma=girinti/kabarik/duz, derinlik_m tahmini; "
+                   "kalinlik yoksa kamera duz bakiyordur (yan yuz gorunmuyor).",
+        },
         "not": "ic_ogeler/siluet/civata ON YUZE duzlestirilmis [0..1] normalize. "
-               "alt_ogeler her ic ogenin kabarik/girintili alt-yapilari.",
+               "alt_ogeler her ic ogenin kabarik/girintili alt-yapilari. "
+               "derinlik_m/kabartma = derinlik algisi (yan-yuz olcumu + golge).",
     }
     with open(os.path.join(cikti, "harita.json"), "w") as f:
         json.dump(harita, f, indent=2, ensure_ascii=False)
@@ -597,6 +722,11 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
 
     print("maske:", mkaynak, "| oge:", okaynak, "| oge sayisi:", len(ogeler),
           "| global civata:", len(civatalar))
+    if kalinlik:
+        print("DERINLIK: kalinlik=%.3fm (oran %.3f) yaw=%.1f pitch=%.1f" %
+              (kalinlik, kalinlik/boy, kam.get("yaw_deg", 0), kam.get("pitch_deg", 0)))
+    else:
+        print("DERINLIK: yan yuz olculemedi (kamera duz bakiyor olabilir)")
     for o in ogeler:
         ek = ""
         if "izgara_sayisi" in o:
@@ -605,6 +735,8 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
             ek += " alt=%d" % len(o["alt_ogeler"])
         if "civatalar" in o:
             ek += " civata=%d" % len(o["civatalar"])
+        ek += " [%s %.2f%s]" % (o.get("kabartma", "?"), o.get("derinlik_orani", 0),
+                                (" %.3fm" % o["derinlik_m"]) if "derinlik_m" in o else "")
         print("  {etiket:14s} x[{x:.3f},{x1:.3f}] y[{y:.3f},{y1:.3f}]".format(**o) + ek)
     print("cikti:", cikti, "| zoom-grid:", zdir)
     return harita

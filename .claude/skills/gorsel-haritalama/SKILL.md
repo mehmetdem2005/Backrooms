@@ -114,12 +114,25 @@ python3 analiz.py <gorsel> <cikti> --koseler "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"
    dokusu yuzunden ham `kapsama` dusuk cikar; ONEMLI olan model kenarinin
    YAPISAL referans ozelliklerine oturmasi + `eksik` bandinin dusuk olmasi.
 
-## Derinlik / cerceve profili (3B akil yurutme)
-- `harita.json -> kamera`: focal, yaw, pitch, px_per_m. 3/4 acida yan/ust yuz
-  gorunur; derinlik = yan-serit_px / px_per_m / sin(yaw).
-- Cerceve KESITI (rim/oluk/bevel) icin: rectified on yuzde sol cerceve boyunca
-  yatay parlaklik+gradyan profili al; duz pervaz / basamak / kanal / panel
-  kenarlarini gradyan zirvelerinden oku, profili ona gore modelle.
+## DERINLIK ALGISI (otomatik olculur, objeden bagimsiz)
+analiz.py artik derinligi TAHMIN etmez, OLCER. harita.json'a yazar:
+- `kamera`: focal, yaw, pitch, `px_per_m_sol` (dusey), `px_per_m_yatay` (yatay).
+- `derinlik.kalinlik_m` / `kalinlik_orani`: **gercek kalinlik** (3/4 gorunumde
+  gorunen YAN YUZ seridinden): `kalinlik = yan_serit_px / (px_per_m * sin|yaw|)`.
+  Hem sag/sol (yaw) hem alt/ust (pitch) seritten olculur, medyani alinir.
+  Kamera DUZ bakiyorsa (yan yuz yok) -> null; insa.py yedek varsayima duser.
+- her `ic_oge` (ve `alt_oge`): `kabartma` = **girinti / kabarik / duz**, ve
+  `derinlik_m` (goreli derinlik). Iki ipucu, ikisi de genel:
+    1) ic vs cevre parlaklik: ic koyu => GIRINTI (golge dolu).
+    2) DIS kenar golge ASIMETRISI: bir dis kenar otekinden cok koyu =>
+       oge KABARIK (isiktan kacan yone golge dusuruyor). Bu, kabarik yuzeyin
+       parlakligi cevreyle ayni oldugunda bile kabarikligi yakalar.
+- insa.py bunlari kullanir: `kalinlik` -> cerceve/panel derinligi;
+  `derinlik_m` -> oge girinti/kabarik miktari; `kabartma` -> girinti mi kabarik
+  blok mu. Derinlik artik HER OBJE icin gorselden gelir, sabit degil.
+- Cerceve KESITI (rim/oluk/bevel) icin ek: rectified on yuzde sol cerceve
+  boyunca yatay parlaklik+gradyan profili al; pervaz/basamak/kanal/panel
+  kenarlarini gradyan zirvelerinden oku (insa.py cok-kademeli kanali kurar).
 
 ## Notlar
 - `--en/--boy` sadece warp hedef **orani** icin; mutlak olcek modelde belirlenir.

@@ -43,7 +43,26 @@ ORAN = H.get("en_boy_orani") or (H["gercek_en_boy"][0]/H["gercek_en_boy"][1])
 EN = round(BOY * ORAN, 4)
 def X(nx): return round(-EN/2 + nx*EN, 4)
 def Z(ny): return round(BOY*(1.0-ny), 4)
-S = (EN+BOY)/2.0                       # olcek referansi (derinlikler buna oranli)
+S = (EN+BOY)/2.0                       # olcek referansi (yedek derinlikler icin)
+
+# ---- DERINLIK ALGISI: haritadan olculen kalinlik + oge-basi derinlik ----
+DRN = H.get("derinlik", {}) or {}
+HBOY = (H.get("gercek_en_boy") or [ORAN, 1.0])[1] or 1.0
+DSCALE = BOY / HBOY                    # harita-boy -> hedef-boy olcek
+KAL_ORAN = DRN.get("kalinlik_orani")  # kalinlik / boy (olculemezse None)
+if KAL_ORAN and KAL_ORAN > 0.012:
+    KALINLIK = KAL_ORAN * BOY          # gercek kalinlik (m), olculen
+    DERIN_KAYNAK = "olculen(kalinlik_orani=%.3f)" % KAL_ORAN
+else:
+    KALINLIK = 0.052 * S               # yedek varsayim (yan yuz gorunmuyorsa)
+    DERIN_KAYNAK = "varsayim(yan yuz olculemedi)"
+
+def oge_derinlik(o, yedek):
+    """Ogenin olculen derinligi (m, hedef olcekte); yoksa yedek."""
+    dm = o.get("derinlik_m")
+    if dm and dm > 0:
+        return max(0.004, dm * DSCALE)
+    return yedek
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
@@ -168,14 +187,16 @@ def join(hedef, digerleri):
     bpy.context.view_layer.objects.active = hedef
     bpy.ops.object.join()
 
-# ----------------------------------------------- derinlik parametreleri (olcekli)
+# ----------------------------------------------- derinlik parametreleri (OLCULEN)
 Y_FRAME = 0.0
-FRAME_DEPTH = 0.078*S
-Y_LEAF = 0.015*S            # panel on yuzu (cerceveden geride)
-LEAF_TH = 0.042*S
-CHAN_DIP = 0.032*S          # cerceve oluk kanali derinligi
-PLATE_UP = 0.013*S          # kabarik plaka yuksekligi
-RECESS = 0.014*S            # genel girinti derinligi
+FRAME_DEPTH = max(0.04*S, KALINLIK)         # gercek kalinlik = cerceve derinligi
+LEAF_TH = FRAME_DEPTH*0.55                  # panel kalinligi (kalinligin parcasi)
+Y_LEAF = FRAME_DEPTH*0.22                   # panel on yuzu (cerceveden geride)
+CHAN_DIP = FRAME_DEPTH*0.42                 # cerceve oluk kanali derinligi
+PLATE_UP = max(0.008*S, KALINLIK*0.22)      # kabarik plaka yuksekligi (yedek)
+RECESS = max(0.010*S, KALINLIK*0.30)        # genel girinti derinligi (yedek)
+print(">>> DERINLIK:", DERIN_KAYNAK, "kalinlik=%.3fm frame_depth=%.3f" %
+      (KALINLIK, FRAME_DEPTH))
 
 # ============================================================ CERCEVE (outline)
 # outline yoksa basit oct dikdortgen kullan
@@ -262,16 +283,20 @@ def kur_oge(o, taban_y):
     t = oge_turu(o)
     x0, x1, z0, z1 = oge_abs(o)
     ck = min(x1-x0, z1-z0)
+    # OLCULEN derinlik (m); yoksa tip-bazli yedek
+    dep = oge_derinlik(o, {"pencere": 0.022*S, "vent": 0.012*S,
+                           "kol": 0.030*S}.get(t, RECESS))
     if t == "pencere":
-        # cift oct cerceve + cam + cevre percin
+        # cift oct cerceve + cam + cevre percin (ledge derinligin yarisinda)
+        ledge = taban_y + dep*0.55
         boolean(obj_k, add_prism("cW1", cham_rect(x0, x1, z0, z1, ck*0.16),
-                                 taban_y-0.001, taban_y+0.020*S))
+                                 taban_y-0.001, ledge))
         ix0, ix1, iz0, iz1 = x0+ck*0.10, x1-ck*0.10, z0+ck*0.06, z1-ck*0.06
         boolean(obj_k, add_prism("cW2", cham_rect(ix0, ix1, iz0, iz1, ck*0.12),
-                                 taban_y+0.016*S, Y_LEAF+LEAF_TH+0.02))
+                                 ledge-0.004*S, Y_LEAF+LEAF_TH+0.02))
         gv = add_prism("Cam", cham_rect(ix0+0.004*S, ix1-0.004*S,
                        iz0+0.004*S, iz1-0.004*S, ck*0.10),
-                       taban_y+0.030*S, taban_y+0.040*S)
+                       taban_y+dep*0.9, taban_y+dep*0.9+0.010*S)
         temizle(gv); gv.data.materials.append(mat_cam); ekler.append(gv)
         # cevre percinleri varsa (oge civatalari) yoksa otomatik dizilim
         if o.get("civatalar"):
@@ -287,7 +312,7 @@ def kur_oge(o, taban_y):
                 yy += (z1-z0)*ad/0.2
     elif t == "vent":
         n = max(2, int(o.get("izgara_sayisi", 5)))
-        dip = taban_y+0.012*S
+        dip = taban_y+dep
         boolean(obj_k, add_prism("cV", cham_rect(x0, x1, z0, z1, ck*0.16),
                                  taban_y-0.001, dip))
         ivx0, ivx1 = x0+(x1-x0)*0.12, x1-(x1-x0)*0.12
@@ -301,17 +326,25 @@ def kur_oge(o, taban_y):
     elif t == "kol":
         al = kabarik_cubuk(o)
         boolean(obj_k, add_prism("cS", rounded_rect(x0, x1, z0, z1, ck*0.16, 8),
-                                 taban_y-0.001, taban_y+0.030*S))
+                                 taban_y-0.001, taban_y+dep))
         bx0, bx1 = X(al["x"]), X(al["x1"]); bz0, bz1 = Z(al["y1"]), Z(al["y"])
         bw = bx1-bx0
+        # kapsul yuksekligi: olculen alt-oge derinligi varsa onu kullan
+        kol_on = taban_y - oge_derinlik(al, 0.004*S)
         kap = add_prism("Kol", rounded_rect(bx0, bx1, bz0, bz1, bw/2, 10),
-                        taban_y-0.004*S, Y_LEAF+0.004*S)
+                        kol_on, Y_LEAF+0.004*S)
         temizle(kap); genel_pah(kap, 0.0018*S, 2)
         kap.data.materials.append(mat_govde); ekler.append(kap)
         if o.get("civatalar"): civatalar_koy(o["civatalar"], taban_y, 0.8)
-    else:   # cep
-        boolean(obj_k, add_prism("cP", rounded_rect(x0, x1, z0, z1, ck*0.12, 6),
-                                 taban_y-0.001, taban_y+RECESS))
+    else:   # cep / kabarik dugme
+        if o.get("kabartma") == "kabarik":
+            blok = add_prism("Kbrk", rounded_rect(x0, x1, z0, z1, ck*0.14, 6),
+                             taban_y-dep, taban_y+0.003*S)
+            temizle(blok); genel_pah(blok, 0.0018*S, 2)
+            blok.data.materials.append(mat_govde); ekler.append(blok)
+        else:
+            boolean(obj_k, add_prism("cP", rounded_rect(x0, x1, z0, z1, ck*0.12, 6),
+                                     taban_y-0.001, taban_y+dep))
         if o.get("civatalar"): civatalar_koy(o["civatalar"], taban_y, 0.8)
 
 # ---------------------------------------------------------- hiyerarsi + insa
@@ -331,10 +364,11 @@ kokler = [i for i in range(len(ogeler)) if ebeveyn[i] is None]
 for i in kokler:
     o = ogeler[i]
     if cocuklar[i]:
-        # KABARIK plaka: yuksekligi olan panel, cocuklar uzerine girinti olur
+        # KABARIK plaka: yuksekligi OLCULEN (parent derinlik_m) ya da yedek
         x0, x1, z0, z1 = oge_abs(o)
         ck = min(x1-x0, z1-z0)
-        Y_PL = Y_LEAF-PLATE_UP
+        up = oge_derinlik(o, PLATE_UP) if o.get("kabartma") != "girinti" else PLATE_UP
+        Y_PL = Y_LEAF-up
         plaka = add_prism("Plaka", rounded_rect(x0, x1, z0, z1, ck*0.10, 6),
                           Y_PL, Y_LEAF+0.004*S)
         plaka.data.materials.append(mat_govde)
