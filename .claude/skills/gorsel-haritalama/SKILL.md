@@ -58,6 +58,13 @@ python3 analiz.py <gorsel> <cikti> --koseler "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"
    sapmadir. fark.png'i Read et, sapan olcuyu duzelt, yeniden uret/dogrula.
    Boylece goz karari kalmaz; model referansa piksel piksel hizalanir.
 
+## Derinlik / cerceve profili (3B akil yurutme)
+- `harita.json -> kamera`: focal, yaw, pitch, px_per_m. 3/4 acida yan/ust yuz
+  gorunur; derinlik = yan-serit_px / px_per_m / sin(yaw).
+- Cerceve KESITI (rim/oluk/bevel) icin: rectified on yuzde sol cerceve boyunca
+  yatay parlaklik+gradyan profili al; duz pervaz / basamak / kanal / panel
+  kenarlarini gradyan zirvelerinden oku, profili ona gore modelle.
+
 ## Notlar
 - `--en/--boy` sadece warp hedef **orani** icin; mutlak olcek modelde belirlenir.
 - FastSAM etiketleri (vent/yuva/pencere) konum sezgiseldir; asil olan koordinatlar.

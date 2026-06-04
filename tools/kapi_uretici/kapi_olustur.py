@@ -129,13 +129,30 @@ ax0, ax1, az0, az1 = X(AC[0]), X(AC[1]), Z(AC[3]), Z(AC[2])   # aciklik abs
 boolean(obj_c, add_box("cut_op", ax0, ax1, az0, az1, -0.10, 0.30))
 recalc(obj_c)
 
-def _on(c): return c.y <= EPS
-def _aci(c):
+# OLCULEN PROFIL: duz dis pervaz (nx 0..0.072) + girintili kanal (0.072..0.141)
+KANAL = 0.091    # kanal bandi genisligi (m) ~ nx 0.069
+# kanali on yuzden oy (rim disarda y=0 kalir, kanal y=0.055'e iner)
+boolean(obj_c, add_box("kanal", ax0-KANAL, ax1+KANAL, az0-KANAL, az1+KANAL, -0.02, 0.045))
+recalc(obj_c)
+
+def _on(c): return c.y <= EPS                      # dis pervaz on yuzu (y=0)
+def _rim_ic(c):                                    # rim/kanal sinir kenari
+    rx0, rx1 = ax0-KANAL, ax1+KANAL
+    rz0, rz1 = az0-KANAL, az1+KANAL
+    if (yakin(c.x, rx0) or yakin(c.x, rx1)) and (rz0-0.01 <= c.z <= rz1+0.01): return True
+    if (yakin(c.z, rz0) or yakin(c.z, rz1)) and (rx0-0.01 <= c.x <= rx1+0.01): return True
+    return False
+# rim ic kenarini pahla (pervazdan kanala yumusak gecis)
+bevel_edges(obj_c, lambda a, b: _on(a) and _on(b) and _rim_ic(a) and _rim_ic(b),
+            offset=0.012, segments=1)
+# kanal tabanindan acikliga (panel kenari) egim
+def _kanal_dip(c): return abs(c.y - 0.045) < 0.012
+def _ack(c):
     if (yakin(c.x, ax0) or yakin(c.x, ax1)) and (az0-0.01 <= c.z <= az1+0.01): return True
     if (yakin(c.z, az0) or yakin(c.z, az1)) and (ax0-0.01 <= c.x <= ax1+0.01): return True
     return False
-bevel_edges(obj_c, lambda a, b: _on(a) and _on(b) and _aci(a) and _aci(b),
-            offset=0.06, segments=1)
+bevel_edges(obj_c, lambda a, b: _kanal_dip(a) and _kanal_dip(b) and _ack(a) and _ack(b),
+            offset=0.02, segments=1)
 recalc(obj_c)
 obj_c.data.materials.append(mat_cerceve)
 unwrap(obj_c)

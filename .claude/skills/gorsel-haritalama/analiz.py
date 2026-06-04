@@ -105,6 +105,43 @@ def en_boy_orani(kose, W, H):
     return float(ar2 ** 0.5) if ar2 > 0 else None
 
 
+def kamera_poz(kose, en, boy, W, H):
+    """Focal + kamera pozu (solvePnP). Derinlik/3B akil yurutme icin.
+    Doner: {focal, mesafe_m, yaw_deg, pitch_deg, px_per_m_sol}."""
+    tl, tr, br, bl = [np.asarray(p, float) for p in kose]
+    u0, v0 = W/2.0, H/2.0
+    m1 = np.array([tl[0], tl[1], 1.0]); m2 = np.array([tr[0], tr[1], 1.0])
+    m3 = np.array([bl[0], bl[1], 1.0]); m4 = np.array([br[0], br[1], 1.0])
+    k2 = np.dot(np.cross(m1, m4), m3) / np.dot(np.cross(m2, m4), m3)
+    k3 = np.dot(np.cross(m1, m4), m2) / np.dot(np.cross(m3, m4), m2)
+    n2 = k2*m2 - m1; n3 = k3*m3 - m1
+    n21, n22, n23 = n2; n31, n32, n33 = n3
+    f2 = -(1.0/(n23*n33))*((n21*n31-(n21*n33+n23*n31)*u0+n23*n33*u0*u0)
+                           + (n22*n32-(n22*n33+n23*n32)*v0+n23*n33*v0*v0))
+    if f2 <= 0:
+        return None
+    f = float(f2**0.5)
+    K = np.array([[f, 0, u0], [0, f, v0], [0, 0, 1.0]])
+    obj = np.array([[0, 0, 0], [en, 0, 0], [en, boy, 0], [0, boy, 0]], np.float32)
+    imgp = np.array([tl, tr, br, bl], np.float32)
+    ok, rvec, tvec = cv2.solvePnP(obj, imgp, K, None)
+    if not ok:
+        return {"focal": round(f, 1)}
+    R, _ = cv2.Rodrigues(rvec)
+    nrm = R @ np.array([0, 0, 1.0])
+    p0, _ = cv2.projectPoints(np.array([[0, boy/2, 0]], np.float32), rvec, tvec, K, None)
+    p1, _ = cv2.projectPoints(np.array([[0.1, boy/2, 0]], np.float32), rvec, tvec, K, None)
+    ppm = float(np.linalg.norm(p1 - p0) / 0.1)
+    return {
+        "focal": round(f, 1),
+        "mesafe_m": round(float(np.linalg.norm(tvec)), 3),
+        "yaw_deg": round(float(np.degrees(np.arctan2(nrm[0], nrm[2]))), 2),
+        "pitch_deg": round(float(np.degrees(np.arctan2(nrm[1], nrm[2]))), 2),
+        "px_per_m_sol": round(ppm, 1),
+        "not_derinlik": "yan-serit_px / px_per_m_sol ~ derinlik*sin(yaw); sol kenardan olc",
+    }
+
+
 def rectify(img, kose, en, boy):
     Ht = 1000
     Wt = max(1, int(round(Ht * float(en) / float(boy))))
@@ -313,6 +350,7 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
         "rectified_boyut": [Wt, Ht],
         "siluet_rectified_normalize": sil_n,
         "ic_ogeler": ogeler,
+        "kamera": kamera_poz(kose, en, boy, W, H),
         "not": "ic_ogeler ve siluet ON YUZE duzlestirilmis [0..1] normalize.",
     }
     with open(os.path.join(cikti, "harita.json"), "w") as f:
