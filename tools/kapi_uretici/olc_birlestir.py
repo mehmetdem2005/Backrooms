@@ -23,6 +23,7 @@ PANEL = os.path.join(PROJE, "models", "kapi_kanat_tripo.glb")
 TARGET_BOY = 2.0       # kapi yuksekligi (m) - kullanici karari
 CLR        = 0.01      # panel ile aciklik arasi bosluk (her kenar, m)
 PANEL_DERINLIK = 0.10  # panel son derinligi (m); cerceve derinligi icinde otursun
+HINGE_SIDE = "sag"     # mentese kenari: "sag" (kapi kolu solda -> mentese sagda) / "sol"
 
 # ---------------------------------------------------------------- GLB decode
 _CT = {5120:('b',1),5121:('B',1),5122:('h',2),5123:('H',2),5125:('I',4),5126:('f',4)}
@@ -127,12 +128,18 @@ sY = panel_boy / pH      # yukseklik
 sZ = panel_en  / pW      # genislik
 sX = panel_der / pD      # derinlik
 
-# Mente (menteseden donus) dunya konumu: sol-ic kenar, aciklik alt+clr
-hinge_x = ic_sol + CLR
+# Mente (menteseden donus) dunya konumu: kol KARSISI ic kenar, aciklik alt+clr.
+# Kapi kolu solda oldugundan mentese SAG kenarda; panel menteseden SOLA uzanir.
+if HINGE_SIDE == "sol":
+    hinge_x  = ic_sol + CLR
+    panel_ox = panel_en/2     # panel menteseden saga
+else:
+    hinge_x  = ic_sag - CLR
+    panel_ox = -panel_en/2    # panel menteseden sola
 base_y  = ic_alt + CLR
 mente = (round(hinge_x,4), round(base_y,4), 0.0)
-# panel instance LOKAL origin (Mente altinda): sol kenar x=0, taban y=0, z merkez
-p_local_origin = (round(panel_en/2,4), round(panel_boy/2,4), 0.0)
+# panel instance LOKAL origin (Mente altinda): mesh ortasi panel_ox, taban y=0, z merkez
+p_local_origin = (round(panel_ox,4), round(panel_boy/2,4), 0.0)
 
 # ---------------------------------------------------------------- collision
 def box(cx,cy,cz,sx,sy,sz):
@@ -143,7 +150,7 @@ col_sag = box((ic_sag+xmax)/2, Hmid, 0,  xmax-ic_sag, TARGET_BOY, D)
 col_ust = box((ic_sol+ic_sag)/2,(ic_ust+TARGET_BOY)/2,0, ac_en, TARGET_BOY-ic_ust, D)
 col_alt = box((ic_sol+ic_sag)/2, ic_alt/2,0, ac_en, ic_alt, D)
 # panel collision (Mente altinda, panel ile ayni offset)
-col_panel = box(panel_en/2, panel_boy/2, 0, panel_en, panel_boy, panel_der)
+col_panel = box(panel_ox, panel_boy/2, 0, panel_en, panel_boy, panel_der)
 
 # ---------------------------------------------------------------- Godot Transform3D
 # Istenen lineer harita (world = M*local), local = ham glTF vert
@@ -171,7 +178,7 @@ out = {
            "son_en":round(panel_en,4),"son_boy":round(panel_boy,4),"son_der":round(panel_der,4),
            "olcek_xyz":[round(sX,5),round(sY,5),round(sZ,5)],
            "local_origin":list(p_local_origin),"transform":panel_tf},
-  "mente":list(mente),
+  "mente":list(mente), "mente_kenar":HINGE_SIDE,
   "collision":{"sol":col_sol,"sag":col_sag,"ust":col_ust,"alt":col_alt,"panel":col_panel},
 }
 with open(os.path.join(PROJE,"models","kapi_birlestir.json"),"w") as f:

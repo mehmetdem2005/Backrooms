@@ -1,6 +1,6 @@
 extends Node3D
 ## Acilabilir sci-fi kapi.
-## Cerceve sabittir; "Mente" dugumu menteseden (sol kenar) doner.
+## Cerceve sabittir; "Mente" dugumu menteseden (SAG kenar, kol karsisi) doner.
 ## Kullanim:  $Kapi.ac()  /  .kapat()  /  .degistir()
 
 @export var acik: bool = false          ## baslangicta acik mi
@@ -14,7 +14,7 @@ var _tween: Tween
 func _ready() -> void:
 	_kapali_y = _mente.rotation.y
 	if acik:
-		_mente.rotation.y = _kapali_y - deg_to_rad(acilma_acisi)
+		_mente.rotation.y = _kapali_y + deg_to_rad(acilma_acisi)
 
 func ac() -> void:
 	_hedefe_git(true)
@@ -27,7 +27,7 @@ func degistir() -> void:
 
 func _hedefe_git(yeni_durum: bool) -> void:
 	acik = yeni_durum
-	var hedef: float = _kapali_y - deg_to_rad(acilma_acisi) if acik else _kapali_y
+	var hedef: float = _kapali_y + deg_to_rad(acilma_acisi) if acik else _kapali_y
 	if _tween != null and _tween.is_running():
 		_tween.kill()
 	_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

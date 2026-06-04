@@ -2,7 +2,8 @@
 
 ; Tripo cerceve + panel birlestirilmis acilabilir kapi.
 ; Olculer tools/kapi_uretici/olc_birlestir.py ile gercek mesh geometrisinden cikarildi
-; (models/kapi_birlestir.json). Cerceve sabit; "Mente" menteseden (sol kenar) doner.
+; (models/kapi_birlestir.json). Cerceve sabit; "Mente" menteseden (SAG kenar) doner;
+; kapi kolu solda oldugu icin mentese kolun karsisinda (sag).
 ; Materyal: Tripo pas dokusu AYNEN korunur (glb icinden gelir).
 
 [ext_resource type="PackedScene" uid="uid://bdgxb0acoa20t" path="res://models/kapi_cerceve_tripo.glb" id="1_cer"]
@@ -50,13 +51,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0042, 0.0168, 0)
 shape = SubResource("Shape_alt")
 
 [node name="Mente" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5121, 0.0435, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5038, 0.0435, 0)
 
 [node name="Kanat" parent="Mente" instance=ExtResource("2_kan")]
-transform = Transform3D(0, 0, 1.90853, 0, 1.75051, 0, -0.461814, 0, 0, 0.5079, 0.8753, 0)
+transform = Transform3D(0, 0, 1.90853, 0, 1.75051, 0, -0.461814, 0, 0, -0.5079, 0.8753, 0)
 
 [node name="KanatGovde" type="AnimatableBody3D" parent="Mente"]
 
 [node name="KanatCarpisma" type="CollisionShape3D" parent="Mente/KanatGovde"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5079, 0.8753, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5079, 0.8753, 0)
 shape = SubResource("Shape_kanat")
