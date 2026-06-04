@@ -2,22 +2,21 @@
 # Backrooms - Sci-fi kapi modeli ureticisi (Blender 4.x, headless)
 # Kullanim:  blender -b -P tools/kapi_uretici/kapi_olustur.py
 #
-# Olculer .claude/skills/gorsel-haritalama ile referans gorselden CIKARILDI
-# (perspektif duzeltilmis on yuz, 0..1 normalize). Donusum:
-#   x = -0.55 + nx*1.10        (sol->sag, toplam en 1.10 m)
-#   z =  2.10 - ny*2.10        (ust ny=0 -> z=2.10, toplam boy 2.10 m)
-#
-# Uretir:
-#   models/kapi_cerceve.glb  -> sabit cerceve (pahli ust + egimli ic kenar)
-#   models/kapi_kanat.glb    -> acilan kanat (oktagonal pencere, izgarali vent,
-#                               hap-yuva), origin sol menteseye tasinmis
-#   /tmp/kapi_preview.png
+# Tum olculer .claude/skills/gorsel-haritalama ile referans gorselden CIKARILDI:
+#   - rembg temiz siluet, FastSAM oge maskeleri, alt-piksel kenar
+#   - EN/BOY orani PERSPEKTIFTEN hesaplandi (varsayim yok): 0.639
+# Oge konumlari nx,ny (on yuz [0..1]) olarak verilir; X()/Z() ile metreye cevrilir.
 
-import bpy, bmesh, os
+import bpy, bmesh, os, math
 from mathutils import Vector
 
 PROJE = "/home/user/Backrooms"
 bpy.ops.wm.read_factory_settings(use_empty=True)
+
+# ===== GERCEK OLCEK (perspektiften oran 0.639) =====
+EN, BOY = 1.31, 2.05            # m ; EN/BOY = 0.6390
+def X(nx): return round(-EN/2 + nx*EN, 4)   # sol(0)->sag(1)
+def Z(ny): return round(BOY*(1.0-ny), 4)    # ust(ny=0)->z=BOY
 
 # ---------------------------------------------------------------- materyaller
 def mat(name, color, metallic=0.7, rough=0.6, alpha=1.0, transmission=0.0):
@@ -33,7 +32,6 @@ def mat(name, color, metallic=0.7, rough=0.6, alpha=1.0, transmission=0.0):
 mat_cerceve = mat("kapi_cerceve", (0.30, 0.28, 0.26), 0.85, 0.55)
 mat_kanat   = mat("kapi_kanat",   (0.46, 0.44, 0.41), 0.70, 0.60)
 mat_cam     = mat("kapi_cam",     (0.03, 0.04, 0.05), 0.10, 0.10, alpha=0.6, transmission=0.5)
-mat_koyu    = mat("kapi_koyu",    (0.09, 0.09, 0.10), 0.55, 0.45)
 
 # ---------------------------------------------------------------- yardimcilar
 # Blender Z-up: x=genislik, z=yukseklik, y=derinlik (on yuz dusuk y, -Y'ye bakar)
@@ -46,12 +44,10 @@ def add_box(name, x0, x1, h0, h1, d0, d1):
     return o
 
 def cham_rect(x0, x1, z0, z1, c):
-    """Pahli koseli dikdortgen (oktagon) - (x,z) nokta listesi."""
     return [(x0+c, z0), (x1-c, z0), (x1, z0+c), (x1, z1-c),
             (x1-c, z1), (x0+c, z1), (x0, z1-c), (x0, z0+c)]
 
 def add_prism(name, pts_xz, y0, y1):
-    """(x,z) profilini y0..y1 derinlige extrude eden prizma."""
     me = bpy.data.meshes.new(name); o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
     bm = bmesh.new()
@@ -99,14 +95,28 @@ def join(hedef, digerleri):
     bpy.context.view_layer.objects.active = hedef
     bpy.ops.object.join()
 
+# ===== OLCULEN nx,ny FRAKSIYONLARI (skill ciktisi) =====
+# pah: duz ust nx[0.12,0.88], inis ny 0.095
+PAH_X0, PAH_X1, PAH_NY = 0.12, 0.88, 0.095
+# aciklik(panel): nx[0.141,0.862] ny[0.091,0.901]
+AC = (0.141, 0.862, 0.091, 0.901)
+# pencere: nx[0.237,0.401] ny[0.135,0.572]
+PEN = (0.237, 0.401, 0.135, 0.572)
+# plaka: nx[0.650,0.832] ny[0.391,0.663]
+PLK = (0.650, 0.832, 0.391, 0.663)
+# vent: nx[0.682,0.802] ny[0.413,0.477] (5 izgara)
+VNT = (0.682, 0.802, 0.413, 0.477)
+# slot: nx[0.724,0.817] ny[0.530,0.651]
+SLT = (0.724, 0.817, 0.530, 0.651)
+
 # ================================================================ CERCEVE
-# Olculen ust pah (rembg siluet): duz ust nx[0.12,0.88]->x[-0.418,0.418]; inis z=1.90
 mesh = bpy.data.meshes.new("cerceve_mesh")
 obj_c = bpy.data.objects.new("Cerceve", mesh)
 bpy.context.collection.objects.link(obj_c)
 bm = bmesh.new()
-pts = [(-0.55, 0.00), (-0.55, 1.91), (-0.418, 2.10),
-       ( 0.418, 2.10), ( 0.55, 1.91), ( 0.55, 0.00)]
+zv = Z(PAH_NY)   # dusey kenar ust z
+pts = [(X(0.0), 0.0), (X(0.0), zv), (X(PAH_X0), BOY),
+       (X(PAH_X1), BOY), (X(1.0), zv), (X(1.0), 0.0)]
 vs = [bm.verts.new((x, 0.0, z)) for x, z in pts]
 f = bm.faces.new(vs)
 r = bmesh.ops.extrude_face_region(bm, geom=[f])
@@ -115,15 +125,14 @@ bmesh.ops.translate(bm, vec=(0, 0.16, 0), verts=ev)
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 bm.to_mesh(mesh); bm.free()
 
-# Ic aciklik: x[-0.41,0.41], z[0.185,1.90]
-boolean(obj_c, add_box("cut_op", -0.395, 0.395, 0.205, 1.90, -0.10, 0.30))
+ax0, ax1, az0, az1 = X(AC[0]), X(AC[1]), Z(AC[3]), Z(AC[2])   # aciklik abs
+boolean(obj_c, add_box("cut_op", ax0, ax1, az0, az1, -0.10, 0.30))
 recalc(obj_c)
 
-# EGIM: ic on kenari genis pahla
 def _on(c): return c.y <= EPS
 def _aci(c):
-    if yakin(abs(c.x), 0.395) and (0.20 <= c.z <= 1.905): return True
-    if (yakin(c.z, 0.205) or yakin(c.z, 1.90)) and (abs(c.x) <= 0.40): return True
+    if (yakin(c.x, ax0) or yakin(c.x, ax1)) and (az0-0.01 <= c.z <= az1+0.01): return True
+    if (yakin(c.z, az0) or yakin(c.z, az1)) and (ax0-0.01 <= c.x <= ax1+0.01): return True
     return False
 bevel_edges(obj_c, lambda a, b: _on(a) and _on(b) and _aci(a) and _aci(b),
             offset=0.06, segments=1)
@@ -132,105 +141,97 @@ obj_c.data.materials.append(mat_cerceve)
 unwrap(obj_c)
 
 # ================================================================ KANAT
-# Panel: x[-0.395,0.395], z[0.20,1.885]
-obj_k = add_box("Kanat", -0.388, 0.388, 0.215, 1.89, 0.030, 0.115)
+# panel: aciklik icine kucuk bosluk
+px0, px1, pz0, pz1 = ax0+0.01, ax1-0.01, az0+0.012, az1-0.012
+obj_k = add_box("Kanat", px0, px1, pz0, pz1, 0.030, 0.115)
 
-# --- Dikey oktagonal pencere (SAM): x[-0.292,-0.099] z[0.89,1.81] ---
-WX0, WX1, WZ0, WZ1 = -0.289, -0.110, 0.899, 1.817
-boolean(obj_k, add_prism("cutV", cham_rect(WX0, WX1, WZ0, WZ1, 0.027), -0.05, 0.085))
+# pencere (oktagonal, derin)
+wx0, wx1, wz0, wz1 = X(PEN[0]), X(PEN[1]), Z(PEN[3]), Z(PEN[2])
+boolean(obj_k, add_prism("cutV", cham_rect(wx0, wx1, wz0, wz1, 0.027), -0.05, 0.085))
 recalc(obj_k)
 obj_k.data.materials.append(mat_kanat)
 
-# on yuz kenar pah yardimcisi (rect sinirinda)
 def _onk(c): return c.y <= 0.030 + EPS
-def _rect_kenar(c, x0, x1, z0, z1):
-    onx = (yakin(c.x, x0) or yakin(c.x, x1)) and (z0 - 0.04 <= c.z <= z1 + 0.04)
-    onz = (yakin(c.z, z0) or yakin(c.z, z1)) and (x0 - 0.04 <= c.x <= x1 + 0.04)
+def _rk(c, x0, x1, z0, z1):
+    onx = (yakin(c.x, x0) or yakin(c.x, x1)) and (z0-0.04 <= c.z <= z1+0.04)
+    onz = (yakin(c.z, z0) or yakin(c.z, z1)) and (x0-0.04 <= c.x <= x1+0.04)
     return onx or onz
-# pencere on kenarini egimle
 bevel_edges(obj_k, lambda a, b: _onk(a) and _onk(b)
-            and _rect_kenar(a, WX0, WX1, WZ0, WZ1) and _rect_kenar(b, WX0, WX1, WZ0, WZ1),
+            and _rk(a, wx0, wx1, wz0, wz1) and _rk(b, wx0, wx1, wz0, wz1),
             offset=0.016, segments=1)
-# panel dis cevre on kenarini hafifce pahla
 bevel_edges(obj_k, lambda a, b: _onk(a) and _onk(b)
-            and _rect_kenar(a, -0.388, 0.388, 0.215, 1.89)
-            and _rect_kenar(b, -0.388, 0.388, 0.215, 1.89),
+            and _rk(a, px0, px1, pz0, pz1) and _rk(b, px0, px1, pz0, pz1),
             offset=0.012, segments=1)
 recalc(obj_k)
 
 ekler = []
-
-# --- Cam (pencere arkasi) ---
-gv = add_prism("camV", cham_rect(-0.281, -0.118, 0.909, 1.807, 0.024), 0.066, 0.078)
+# cam
+gv = add_prism("camV", cham_rect(wx0+0.008, wx1-0.008, wz0+0.01, wz1-0.01, 0.024), 0.066, 0.078)
 gv.data.materials.append(mat_cam); ekler.append(gv)
 
-# --- Kabarik arka plaka (vent+slot altinda, SAM 0.052 bolgesi): x[0.17,0.37] z[0.71,1.27]
-plaka = add_box("Plaka", 0.165, 0.365, 0.707, 1.280, -0.006, 0.04)
+# kabarik plaka
+plx0, plx1, plz0, plz1 = X(PLK[0]), X(PLK[1]), Z(PLK[3]), Z(PLK[2])
+plaka = add_box("Plaka", plx0, plx1, plz0, plz1, -0.006, 0.04)
 bevel_edges(plaka, lambda a, b: (a.y <= -0.006+EPS) and (b.y <= -0.006+EPS),
             offset=0.006, segments=1)
 recalc(plaka); plaka.data.materials.append(mat_kanat); ekler.append(plaka)
 
-# --- VENT (izgarali, kabarik) (SAM): x[0.204,0.33] z[1.08,1.232]
-vent = add_box("Vent", 0.200, 0.332, 1.098, 1.232, -0.020, 0.04)
-for zc in (1.110, 1.134, 1.158, 1.182, 1.206):  # 5 izgara (olculen)
-    boolean(vent, add_box("ol", 0.212, 0.320, zc-0.007, zc+0.007, -0.05, 0.004))
+# vent + 5 izgara
+vx0, vx1, vz0, vz1 = X(VNT[0]), X(VNT[1]), Z(VNT[3]), Z(VNT[2])
+vent = add_box("Vent", vx0, vx1, vz0, vz1, -0.020, 0.04)
+for z in [vz0 + (vz1-vz0)*(i+0.5)/5 for i in range(5)]:
+    boolean(vent, add_box("ol", vx0+0.012, vx1-0.012, z-0.007, z+0.007, -0.05, 0.004))
 bevel_edges(vent, lambda a, b: (a.y <= -0.020+EPS) and (b.y <= -0.020+EPS),
             offset=0.005, segments=1)
 recalc(vent); vent.data.materials.append(mat_kanat); ekler.append(vent)
 
-# --- SLOT (hap, girintili) (SAM): x[0.25,0.348] z[0.733,0.985]
-slot = add_prism("Slot", cham_rect(0.246, 0.365, 0.732, 0.986, 0.042), -0.014, 0.04)
-boolean(slot, add_prism("cutS", cham_rect(0.268, 0.343, 0.757, 0.961, 0.030), -0.05, 0.020))
+# slot (oktagonal pill, girintili)
+sx0, sx1, sz0, sz1 = X(SLT[0]), X(SLT[1]), Z(SLT[3]), Z(SLT[2])
+slot = add_prism("Slot", cham_rect(sx0, sx1, sz0, sz1, 0.042), -0.014, 0.04)
+boolean(slot, add_prism("cutS", cham_rect(sx0+0.022, sx1-0.022, sz0+0.025, sz1-0.025, 0.03), -0.05, 0.020))
 bevel_edges(slot, lambda a, b: (a.y <= -0.014+EPS) and (b.y <= -0.014+EPS),
             offset=0.005, segments=1)
 recalc(slot); slot.data.materials.append(mat_kanat); ekler.append(slot)
 
-# birlestir
 join(obj_k, ekler)
 unwrap(obj_k)
+HINGE_X = px0   # menteseden donus icin sol kenar
 
-# ================================================================ ONIZLEME
+# ================================================================ ONIZLEME (perspektif)
 cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
 bpy.context.collection.objects.link(cam)
-cam.location = Vector((-1.55, -2.55, 1.35))
-hedef = Vector((0.0, 0.0, 1.0))
-cam.rotation_euler = (hedef - cam.location).to_track_quat('-Z', 'Y').to_euler()
-cam.data.lens = 50
+cam.location = Vector((-1.6, -2.6, 1.30)); cam.data.lens = 50
+hed = Vector((0.0, 0.0, 1.0))
+cam.rotation_euler = (hed - cam.location).to_track_quat('-Z', 'Y').to_euler()
 
-def isik(name, e, sz, loc):
-    L = bpy.data.objects.new(name, bpy.data.lights.new(name, 'AREA'))
-    bpy.context.collection.objects.link(L)
-    L.data.energy = e; L.data.size = sz; L.location = Vector(loc)
-    L.rotation_euler = (hedef - L.location).to_track_quat('-Z', 'Y').to_euler()
-isik("Key", 400, 3.0, (2.5, -2.5, 3.0))
-isik("Fill", 120, 4.0, (-2.5, -2.0, 1.5))
+def isik(e, sz, loc):
+    L = bpy.data.objects.new("L", bpy.data.lights.new("L", 'AREA'))
+    bpy.context.collection.objects.link(L); L.data.energy = e; L.data.size = sz
+    L.location = Vector(loc)
+    L.rotation_euler = (hed - L.location).to_track_quat('-Z', 'Y').to_euler()
+isik(400, 3.0, (2.5, -2.5, 3.0)); isik(120, 4.0, (-2.5, -2.0, 1.5))
 
-world = bpy.data.worlds.new("W"); bpy.context.scene.world = world
-world.use_nodes = True
-world.node_tree.nodes["Background"].inputs[0].default_value = (0.05, 0.05, 0.06, 1.0)
-world.node_tree.nodes["Background"].inputs[1].default_value = 0.4
+w = bpy.data.worlds.new("W"); bpy.context.scene.world = w; w.use_nodes = True
+w.node_tree.nodes["Background"].inputs[0].default_value = (0.05, 0.05, 0.06, 1)
+w.node_tree.nodes["Background"].inputs[1].default_value = 0.4
 
-sc = bpy.context.scene
-sc.camera = cam
+sc = bpy.context.scene; sc.camera = cam
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
 sc.cycles.samples = 48; sc.cycles.use_denoising = False
-sc.render.resolution_x = 760; sc.render.resolution_y = 1000
+sc.render.resolution_x = int(900*EN/BOY); sc.render.resolution_y = 900
 sc.view_settings.view_transform = 'AgX'
 sc.render.filepath = "/tmp/kapi_preview.png"
 bpy.ops.render.render(write_still=True)
 print(">>> ONIZLEME: /tmp/kapi_preview.png")
 
-# --- Ortografik ON render (referansla birebir karsilastirma icin) ---
-import math as _m
+# ortografik ON (dogrulama icin)
 camo = bpy.data.objects.new("CamO", bpy.data.cameras.new("CamO"))
 bpy.context.collection.objects.link(camo)
-camo.data.type = 'ORTHO'
-camo.data.ortho_scale = 2.10          # boy = 2.10 m tam sigsin
-camo.location = Vector((0.0, -3.0, 1.05))
-camo.rotation_euler = (_m.radians(90), 0, 0)   # -Z -> +Y (on yuze bak)
+camo.data.type = 'ORTHO'; camo.data.ortho_scale = BOY
+camo.location = Vector((0.0, -3.0, BOY/2)); camo.rotation_euler = (math.radians(90), 0, 0)
 sc.camera = camo
 sc.render.film_transparent = True
-sc.render.resolution_x = 524; sc.render.resolution_y = 1000
+sc.render.resolution_x = int(1000*EN/BOY); sc.render.resolution_y = 1000
 sc.render.filepath = "/tmp/kapi_front.png"
 bpy.ops.render.render(write_still=True)
 sc.render.film_transparent = False
@@ -238,8 +239,7 @@ print(">>> ON ORTO: /tmp/kapi_front.png")
 
 # ================================================================ EXPORT
 os.makedirs(os.path.join(PROJE, "models"), exist_ok=True)
-# kanat origin'ini menteseye (sol kenar, derinlik ortasi) tasi
-bpy.context.scene.cursor.location = Vector((-0.388, 0.0725, 0.0))
+bpy.context.scene.cursor.location = Vector((HINGE_X, 0.0725, 0.0))
 bpy.ops.object.select_all(action='DESELECT'); obj_k.select_set(True)
 bpy.context.view_layer.objects.active = obj_k
 bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
@@ -255,4 +255,5 @@ def export(obj, path):
 
 export(obj_c, os.path.join(PROJE, "models", "kapi_cerceve.glb"))
 export(obj_k, os.path.join(PROJE, "models", "kapi_kanat.glb"))
+print(">>> HINGE_X=%.4f  EN=%.3f BOY=%.3f" % (HINGE_X, EN, BOY))
 print(">>> BITTI")

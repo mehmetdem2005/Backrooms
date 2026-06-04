@@ -10,8 +10,11 @@ Amac: referans gorseli "bakip hatirlayarak" degil, **olcerek** modellemek.
 ## Pipeline (analiz.py otomatik yapar)
 1. **rembg (U^2-Net)** -> arka plani ayirir, grunge/golgeden bagimsiz TEMIZ siluet
    maskesi. (Otsu esiklemesi grunge dokuda kayar; rembg kaymaz.)
-2. **Sanal kose + rectify** -> siluetin 6-nokta poligonundan yan/ust kenarlari
-   uzatip on-yuz dikdortgeninin koselerini bulur, perspektifi ON YUZE duzeltir.
+2. **Sanal kose + GERCEK EN/BOY + rectify** -> siluetin 6-nokta poligonundan
+   on-yuz koselerini bulur. EN/BOY oranini **perspektiften hesaplar**
+   (Zhang-He metrik rektifikasyon; --en/--boy verilmezse) -> oran VARSAYILMAZ,
+   olculur. Sonra perspektifi dogru oranli ON YUZE duzeltir.
+   (Onemli: yanlis oran = "genel bicim tutmuyor"; bu adim onu cozer.)
 3. **FastSAM (segment-everything)** -> her ic ogeyi (pencere, vent, yuva) maske
    olarak bulur; kaba sinir kutulari verir.
 4. **ALT-PIKSEL kesinlestirme** -> her kutunun 4 kenarini gradyan profili +

@@ -82,6 +82,29 @@ def sanal_koseler(cnt):
     return np.array([TL, TR, BR, BL], np.float32)
 
 
+def en_boy_orani(kose, W, H):
+    """Perspektifteki dikdortgenin GERCEK en/boy oranini koselerden hesapla
+    (Zhang-He metrik rektifikasyon). kose: TL,TR,BR,BL piksel."""
+    tl, tr, br, bl = [np.asarray(p, float) for p in kose]
+    u0, v0 = W / 2.0, H / 2.0
+    m1 = np.array([tl[0], tl[1], 1.0]); m2 = np.array([tr[0], tr[1], 1.0])
+    m3 = np.array([bl[0], bl[1], 1.0]); m4 = np.array([br[0], br[1], 1.0])
+    k2 = np.dot(np.cross(m1, m4), m3) / np.dot(np.cross(m2, m4), m3)
+    k3 = np.dot(np.cross(m1, m4), m2) / np.dot(np.cross(m3, m4), m2)
+    n2 = k2 * m2 - m1
+    n3 = k3 * m3 - m1
+    n21, n22, n23 = n2; n31, n32, n33 = n3
+    f2 = -(1.0/(n23*n33)) * ((n21*n31 - (n21*n33+n23*n31)*u0 + n23*n33*u0*u0)
+                             + (n22*n32 - (n22*n33+n23*n32)*v0 + n23*n33*v0*v0))
+    if f2 <= 0:
+        return None
+    f = f2 ** 0.5
+    A = np.array([[f, 0, u0], [0, f, v0], [0, 0, 1.0]])
+    Ai = np.linalg.inv(A); B = Ai.T @ Ai
+    ar2 = (n2 @ B @ n2) / (n3 @ B @ n3)
+    return float(ar2 ** 0.5) if ar2 > 0 else None
+
+
 def rectify(img, kose, en, boy):
     Ht = 1000
     Wt = max(1, int(round(Ht * float(en) / float(boy))))
@@ -228,6 +251,15 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
     else:
         kose = sanal_koseler(cnt)
 
+    # GERCEK en/boy: kullanici vermediyse perspektiften hesapla (varsayma!)
+    oran_kaynak = "verilen"
+    if en is None or boy is None:
+        ar = en_boy_orani(kose, W, H)
+        if ar is None:
+            en, boy, oran_kaynak = 1.0, 2.0, "varsayilan(hesaplanamadi)"
+        else:
+            en, boy, oran_kaynak = ar, 1.0, "perspektiften_hesaplandi"
+
     rect, M, (Wt, Ht) = rectify(img, kose, en, boy)
     cv2.imwrite(os.path.join(cikti, "rectified_temiz.png"), rect)
 
@@ -271,7 +303,9 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
     harita = {
         "kaynak": os.path.basename(gorsel),
         "gorsel_boyut": [W, H],
-        "gercek_en_boy": [en, boy],
+        "gercek_en_boy": [round(en, 5), round(boy, 5)],
+        "en_boy_orani": round(en / boy, 5),
+        "oran_kaynak": oran_kaynak,
         "maske_kaynak": mkaynak,
         "oge_kaynak": okaynak,
         "kose_kaynak": "manuel" if manuel_kose is not None else "rembg_sanal",
@@ -319,8 +353,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("gorsel")
     ap.add_argument("cikti")
-    ap.add_argument("--en", type=float, default=1.1)
-    ap.add_argument("--boy", type=float, default=2.1)
+    ap.add_argument("--en", type=float, default=None,
+                    help="verilmezse perspektiften GERCEK oran hesaplanir")
+    ap.add_argument("--boy", type=float, default=None)
     ap.add_argument("--koseler", type=str, default=None,
                     help='Manuel: "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"')
     a = ap.parse_args()
