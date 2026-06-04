@@ -246,6 +246,60 @@ def derinlik_isaret(gray, x0, y0, x1, y1):
     return "duz", round(min(1.0, abs(diff)/55.0), 3)
 
 
+# ---------------------------------------------------- MONOKULER DERINLIK (Depth Anything V2)
+_DEPTH_PIPE = None     # lazy-load cache
+
+
+def derinlik_haritasi(img):
+    """Depth Anything V2 (Apache-2.0, ucretsiz) ile YOGUN relative derinlik haritasi.
+    Albedo/grunge'dan BAGIMSIZ (parlaklik degil, sahne derinligi). Doner: float32
+    HxW (buyuk=YAKIN). GORSEL_DEPTH=0 ile kapatilir; model yoksa None (yedege duser)."""
+    if os.environ.get("GORSEL_DEPTH", "1") == "0":
+        return None
+    global _DEPTH_PIPE
+    try:
+        from transformers import pipeline
+        from PIL import Image
+        if _DEPTH_PIPE is None:
+            _DEPTH_PIPE = pipeline(
+                "depth-estimation",
+                model="depth-anything/Depth-Anything-V2-Small-hf", device="cpu")
+        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        out = _DEPTH_PIPE(Image.fromarray(rgb))
+        return np.asarray(out["depth"], dtype=np.float32)
+    except Exception as e:
+        print("derinlik modeli kullanilamadi (%s); golge yedegine dusuluyor"
+              % type(e).__name__)
+        return None
+
+
+def derinlik_isaret_depth(drect, maske_r, x0, y0, x1, y1):
+    """Ogenin girinti/kabarik yonunu + goreli derinligini DERINLIK haritasindan
+    oku (rectified). buyuk=yakin: ic UZAK(kucuk) => GIRINTI; ic YAKIN(buyuk) =>
+    KABARIK. Olcek = obje derinlik std'i. Albedo/grunge'a bagimsiz (sezgiselden
+    daha saglam). Doner: (isaret, guc[0..1])."""
+    H, W = drect.shape
+    px0, py0, px1, py1 = int(x0*W), int(y0*H), int(x1*W), int(y1*H)
+    pad = max(2, int(0.012*min(W, H)))
+    ic = drect[py0+pad:py1-pad, px0+pad:px1-pad]
+    ox0, oy0 = max(0, px0-3*pad), max(0, py0-3*pad)
+    ox1, oy1 = min(W, px1+3*pad), min(H, py1+3*pad)
+    ring = drect[oy0:oy1, ox0:ox1].astype(np.float32).copy()
+    ring[py0-oy0:py1-oy0, px0-ox0:px1-ox0] = np.nan
+    if ic.size == 0 or np.all(np.isnan(ring)):
+        return "duz", 0.0
+    diff = float(np.median(ic)) - float(np.nanmedian(ring))
+    obj = drect[maske_r > 127] if maske_r is not None else drect
+    sca = float(np.std(obj)) or 1.0
+    th = 0.22 * sca
+    guc = round(min(1.0, abs(diff) / (1.6*sca)), 3)
+    if diff < -th:
+        return "girinti", guc
+    if diff > th:
+        return "kabarik", guc
+    return "duz", guc
+
+
 def rectify(img, kose, en, boy):
     Ht = 1000
     Wt = max(1, int(round(Ht * float(en) / float(boy))))
@@ -603,10 +657,38 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
     # ALT-PIKSEL kesinlestirme (SAM kaba kutu -> gradyan kenari)
     gray = cv2.GaussianBlur(cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY), (3, 3), 0).astype(np.float32)
     gray8 = cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY)
-    gray_d = cv2.GaussianBlur(gray8, (5, 5), 0).astype(np.float32)  # kabartma okumasi
-    # DERINLIK: kamera + gercek kalinlik (3/4 yan yuz)
+    gray_d = cv2.GaussianBlur(gray8, (5, 5), 0).astype(np.float32)  # kabartma yedegi
+    # DERINLIK: kamera + gercek kalinlik (3/4 yan yuz) + MONOKULER derinlik haritasi
     kam = kamera_poz(kose, en, boy, W, H)
     kalinlik = olc_kalinlik(mask, kose, kam)
+    depth = derinlik_haritasi(img)                  # Depth Anything V2 (None=yedek)
+    if depth is not None:
+        depth_rect = cv2.warpPerspective(depth, M, (Wt, Ht))
+        derinlik_kaynak = "depth-anything-v2"
+        # PLANAR DETREND: 3/4 egimi cikar -> sadece YEREL kabarti kalir
+        # (egim global std'yi sisirip kucuk recess'leri 'duz' gosteriyordu)
+        ys_, xs_ = np.where(maske_r > 127)
+        if len(xs_) > 50:
+            Aml = np.c_[xs_.astype(np.float32), ys_.astype(np.float32),
+                        np.ones(len(xs_), np.float32)]
+            coef, *_ = np.linalg.lstsq(Aml, depth_rect[ys_, xs_], rcond=None)
+            yy, xx = np.mgrid[0:Ht, 0:Wt]
+            duzlem = (coef[0]*xx + coef[1]*yy + coef[2]).astype(np.float32)
+            depth_rect = depth_rect - duzlem        # yerel kabarti (relief)
+        # gorsel kontrol: rectified relief (inferno)
+        dv = cv2.normalize(depth_rect, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        cv2.imwrite(os.path.join(cikti, "depth_rect.png"),
+                    cv2.applyColorMap(dv, cv2.COLORMAP_INFERNO))
+    else:
+        depth_rect = None
+        derinlik_kaynak = "golge_yedek"
+
+    def _isaret(x0, y0, x1, y1):
+        """Model varsa derinlik haritasindan; yoksa golge sezgiselinden."""
+        if depth_rect is not None:
+            return derinlik_isaret_depth(depth_rect, maske_r, x0, y0, x1, y1)
+        return derinlik_isaret(gray_d, x0, y0, x1, y1)
+
     ogeler = []
     for a, x0, y0, x1, y1 in sorted(feats, key=lambda f: f[2]):
         try:
@@ -626,8 +708,9 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
         }
         if et == "vent":
             d["izgara_sayisi"] = int(vent_izgara(gray, x0, y0, x1, y1))
-        # DERINLIK ALGISI: girinti/kabarik yonu + goreli derinlik (golgeden)
-        isaret, guc = derinlik_isaret(gray_d, x0, y0, x1, y1)
+        # DERINLIK ALGISI: girinti/kabarik yonu + goreli derinlik
+        # (model: derinlik haritasi; yedek: golge). Metrik olcek = geometrik kalinlik.
+        isaret, guc = _isaret(x0, y0, x1, y1)
         d["kabartma"] = isaret
         d["derinlik_orani"] = guc
         if kalinlik:
@@ -637,7 +720,7 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
         alt = alt_ogeler(rect, x0, y0, x1, y1)
         if alt:
             for al in alt:
-                ai, ag = derinlik_isaret(gray_d, al["x"], al["y"], al["x1"], al["y1"])
+                ai, ag = _isaret(al["x"], al["y"], al["x1"], al["y1"])
                 al["kabartma"] = ai
                 if kalinlik:
                     kk = 0.40 if ai == "kabarik" else 0.50 if ai == "girinti" else 0.15
@@ -672,8 +755,10 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
         "derinlik": {
             "kalinlik_m": kalinlik,
             "kalinlik_orani": round(kalinlik/boy, 4) if kalinlik else None,
-            "yontem": "3/4 yan-yuz serit / (px_per_m_yatay*sin(yaw)); kabartma=golge",
-            "not": "ic_ogeler[].kabartma=girinti/kabarik/duz, derinlik_m tahmini; "
+            "kabartma_kaynak": derinlik_kaynak,
+            "yontem": "kalinlik=3/4 yan-serit/(px_per_m*sin(yaw)) [geometrik metrik]; "
+                      "kabartma/derinlik_m=Depth Anything V2 (varsa) yoksa golge yedek",
+            "not": "ic_ogeler[].kabartma=girinti/kabarik/duz, derinlik_m=guc*kalinlik; "
                    "kalinlik yoksa kamera duz bakiyordur (yan yuz gorunmuyor).",
         },
         "not": "ic_ogeler/siluet/civata ON YUZE duzlestirilmis [0..1] normalize. "
@@ -723,10 +808,11 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
     print("maske:", mkaynak, "| oge:", okaynak, "| oge sayisi:", len(ogeler),
           "| global civata:", len(civatalar))
     if kalinlik:
-        print("DERINLIK: kalinlik=%.3fm (oran %.3f) yaw=%.1f pitch=%.1f" %
-              (kalinlik, kalinlik/boy, kam.get("yaw_deg", 0), kam.get("pitch_deg", 0)))
+        print("DERINLIK: kalinlik=%.3fm (oran %.3f) yaw=%.1f pitch=%.1f | kabartma=%s" %
+              (kalinlik, kalinlik/boy, kam.get("yaw_deg", 0), kam.get("pitch_deg", 0),
+               derinlik_kaynak))
     else:
-        print("DERINLIK: yan yuz olculemedi (kamera duz bakiyor olabilir)")
+        print("DERINLIK: yan yuz olculemedi (kamera duz) | kabartma=%s" % derinlik_kaynak)
     for o in ogeler:
         ek = ""
         if "izgara_sayisi" in o:

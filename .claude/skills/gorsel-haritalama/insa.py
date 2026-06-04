@@ -30,6 +30,7 @@ def _arg(ad, vars):
     return argv[argv.index(ad)+1] if ad in argv else vars
 BOY = float(_arg("--boy", "2.05"))
 OUTDIR = _arg("--out", "models")
+POLY = int(_arg("--poly", "6000"))      # mobil ucgen butcesi (parca basina)
 
 with open(os.path.join(ANALIZ, "harita.json")) as f:
     H = json.load(f)
@@ -58,9 +59,11 @@ else:
     DERIN_KAYNAK = "varsayim(yan yuz olculemedi)"
 
 def oge_derinlik(o, yedek):
-    """Ogenin olculen derinligi (m, hedef olcekte); yoksa yedek."""
-    dm = o.get("derinlik_m")
-    if dm and dm > 0:
+    """Ogenin OLCULEN derinligi (m, hedef olcekte) - ama yalniz model KARARLI ise.
+    Depth Anything kucuk/sig detayda 'duz' der; o zaman tip-bazli yedege duser
+    (plaka kabarikligi, vent derinligi yapisal bilgiden gelir)."""
+    dm = o.get("derinlik_m"); orn = o.get("derinlik_orani", 0) or 0
+    if dm and dm > 0 and o.get("kabartma") in ("girinti", "kabarik") and orn >= 0.18:
         return max(0.004, dm * DSCALE)
     return yedek
 
@@ -95,7 +98,7 @@ def cham_rect(x0, x1, z0, z1, c):
     return [(x0+c, z0), (x1-c, z0), (x1, z0+c), (x1, z1-c),
             (x1-c, z1), (x0+c, z1), (x0, z1-c), (x0, z0+c)]
 
-def rounded_rect(x0, x1, z0, z1, r, seg=8):
+def rounded_rect(x0, x1, z0, z1, r, seg=5):     # mobil: dusuk segment
     r = min(r, (x1-x0)/2, (z1-z0)/2)
     merkez = [(x1-r, z0+r), (x1-r, z1-r), (x0+r, z1-r), (x0+r, z0+r)]
     bas = [-math.pi/2, 0.0, math.pi/2, math.pi]
@@ -119,7 +122,7 @@ def add_prism(name, pts_xz, y0, y1):
     bm.to_mesh(me); bm.free()
     return o
 
-def add_cyl(name, cx, cz, r, y0, y1, dome=0.0, verts=18):
+def add_cyl(name, cx, cz, r, y0, y1, dome=0.0, verts=10):   # mobil: dusuk vert
     bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=(y1-y0))
     o = bpy.context.active_object; o.name = name
     o.rotation_euler = (math.radians(90), 0, 0)
@@ -392,10 +395,30 @@ def yakin_oge(b):
     return False
 civatalar_koy([b for b in H.get("civatalar_global", []) if not yakin_oge(b)], Y_LEAF)
 
-temizle(obj_k); genel_pah(obj_k, 0.0022*S, 2)
+temizle(obj_k); genel_pah(obj_k, 0.0022*S, 1)
 join(obj_k, ekler)
 try: unwrap(obj_k)
 except Exception: pass
+
+# ----------------------------------------------- LOW-POLY MOBIL BUTCE
+def tri_say(obj):
+    me = obj.data
+    return sum((len(p.vertices)-2) for p in me.polygons)
+
+def poly_butce(obj, butce):
+    """Mobil icin ucgen butcesini asarsa Decimate(collapse) ile indir; raporla."""
+    t0 = tri_say(obj)
+    if t0 > butce:
+        m = obj.modifiers.new("dec", 'DECIMATE')
+        m.decimate_type = 'COLLAPSE'; m.ratio = max(0.05, butce/float(t0))
+        m.use_collapse_triangulate = True
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=m.name)
+        for p in obj.data.polygons: p.use_smooth = False
+    print(">>> POLY %-8s tri: %d -> %d (butce %d)" % (obj.name, t0, tri_say(obj), butce))
+
+poly_butce(obj_k, POLY)
+poly_butce(obj_c, max(1500, POLY//2))
 
 # ============================================================ RENDER + EXPORT
 def kamera_isik(hedef):
@@ -434,6 +457,18 @@ sc.render.filepath = "/tmp/insa_front.png"
 bpy.ops.render.render(write_still=True)
 sc.render.film_transparent = False
 print(">>> ON ORTO: /tmp/insa_front.png")
+
+# YAN ORTO (derinlik/kabarti profili dogrulamasi icin)
+cams = bpy.data.objects.new("CamS", bpy.data.cameras.new("CamS"))
+bpy.context.collection.objects.link(cams)
+cams.data.type = 'ORTHO'; cams.data.ortho_scale = BOY
+cams.location = Vector((EN*2.0, 0.0, BOY/2)); cams.rotation_euler = (math.radians(90), 0, math.radians(90))
+sc.camera = cams; sc.render.film_transparent = True
+sc.render.resolution_x = 700; sc.render.resolution_y = 1000
+sc.render.filepath = "/tmp/insa_side.png"
+bpy.ops.render.render(write_still=True)
+sc.render.film_transparent = False
+print(">>> YAN ORTO: /tmp/insa_side.png (derinlik profili)")
 
 os.makedirs(OUTDIR, exist_ok=True)
 def export(obj, path):

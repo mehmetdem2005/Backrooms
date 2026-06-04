@@ -70,10 +70,11 @@ Tur-surumlu (type-driven) insa, tamamen haritadan:
 
 ### Uctan-uca akis (yeni obje icin tek komut zinciri)
 ```
-export YOLO_CONFIG_DIR=/tmp/ultra MPLCONFIGDIR=/tmp/mpl
-python3 analiz.py <gorsel> <cikti>                 # detayli harita
-blender -b -P insa.py -- <cikti> --boy 2.05        # haritadan otomatik model
+export YOLO_CONFIG_DIR=/tmp/ultra MPLCONFIGDIR=/tmp/mpl HF_HOME=/tmp/hf
+python3 analiz.py <gorsel> <cikti>                 # detayli harita + DERINLIK (Depth Anything V2)
+blender -b -P insa.py -- <cikti> --boy 2.05 --poly 6000   # low-poly mobil model
 python3 dogrula.py <cikti>/rectified_temiz.png /tmp/insa_front.png fark.png
+# /tmp/insa_side.png = yan-profil (derinlik) dogrulamasi
 ```
 Detay eksikse: once analiz.py'nin detay tespitini iyilestir (genel), gerekiyorsa
 zoom-grid'den okunan degeri harita.json'a el ile ekle -> insa.py onu kullanir.
@@ -114,25 +115,36 @@ python3 analiz.py <gorsel> <cikti> --koseler "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"
    dokusu yuzunden ham `kapsama` dusuk cikar; ONEMLI olan model kenarinin
    YAPISAL referans ozelliklerine oturmasi + `eksik` bandinin dusuk olmasi.
 
-## DERINLIK ALGISI (otomatik olculur, objeden bagimsiz)
-analiz.py artik derinligi TAHMIN etmez, OLCER. harita.json'a yazar:
-- `kamera`: focal, yaw, pitch, `px_per_m_sol` (dusey), `px_per_m_yatay` (yatay).
-- `derinlik.kalinlik_m` / `kalinlik_orani`: **gercek kalinlik** (3/4 gorunumde
-  gorunen YAN YUZ seridinden): `kalinlik = yan_serit_px / (px_per_m * sin|yaw|)`.
-  Hem sag/sol (yaw) hem alt/ust (pitch) seritten olculur, medyani alinir.
-  Kamera DUZ bakiyorsa (yan yuz yok) -> null; insa.py yedek varsayima duser.
-- her `ic_oge` (ve `alt_oge`): `kabartma` = **girinti / kabarik / duz**, ve
-  `derinlik_m` (goreli derinlik). Iki ipucu, ikisi de genel:
-    1) ic vs cevre parlaklik: ic koyu => GIRINTI (golge dolu).
-    2) DIS kenar golge ASIMETRISI: bir dis kenar otekinden cok koyu =>
-       oge KABARIK (isiktan kacan yone golge dusuruyor). Bu, kabarik yuzeyin
-       parlakligi cevreyle ayni oldugunda bile kabarikligi yakalar.
-- insa.py bunlari kullanir: `kalinlik` -> cerceve/panel derinligi;
-  `derinlik_m` -> oge girinti/kabarik miktari; `kabartma` -> girinti mi kabarik
-  blok mu. Derinlik artik HER OBJE icin gorselden gelir, sabit degil.
-- Cerceve KESITI (rim/oluk/bevel) icin ek: rectified on yuzde sol cerceve
-  boyunca yatay parlaklik+gradyan profili al; pervaz/basamak/kanal/panel
-  kenarlarini gradyan zirvelerinden oku (insa.py cok-kademeli kanali kurar).
+## DERINLIK ALGISI (profesyonel + ucretsiz; objeden bagimsiz)
+Derinlik TAHMIN edilmez; iki bagimsiz kaynaktan OLCULUR (ML model + geometri):
+
+1. **Monoküler derinlik modeli — Depth Anything V2** (Apache-2.0, ucretsiz, SOTA):
+   `derinlik_haritasi()` orijinal goruntude YOGUN relative derinlik uretir;
+   M ile rectified on yuze warp edilir, **planar egim (3/4) cikarilir** (detrend)
+   -> sadece YEREL kabarti kalir -> `depth_rect.png`. Her oge `derinlik_isaret_depth`
+   ile ic-vs-cevre medyanindan **girinti/kabarik + goreli derinlik** alir.
+   KRITIK avantaj: parlaklik degil SAHNE DERINLIGI okunur -> **grunge/pas lekesi
+   derinlige karismaz** (sezgisel yontemin tam zayifligi cozulur).
+   `GORSEL_DEPTH=0` ile kapatilir; model yoksa golge sezgiseline (yedek) duser.
+2. **Geometrik metrik capa** — `olc_kalinlik()`: 3/4 gorunumde gorunen YAN YUZ
+   seridinden GERCEK kalinlik = `yan_serit_px / (px_per_m * sin|yaw|)` (sag/sol +
+   alt/ust medyani). Model goreli derinligi bu metrik kalinlikla olceklenir.
+   Kamera DUZ bakiyorsa null -> insa.py yedek varsayima duser.
+
+harita.json: `derinlik{kalinlik_m, kalinlik_orani, kabartma_kaynak}`; her
+`ic_oge`/`alt_oge` -> `kabartma` (girinti/kabarik/duz) + `derinlik_m`.
+- insa.py KARARLI model okumasini kullanir (derinlik_orani>=0.18); model "duz"/
+  zayif derse (kucuk/sig detay: vent, plaka kabarikligi) YAPISAL tip-yedegine duser
+  (plaka cocuklu->kabarik, vent->izgaradan recess). Boylece buyuk recess'ler (pencere,
+  kol) modelden metrik, ince detay yapidan gelir.
+
+## LOW-POLY / MOBIL CIKTI (insa.py)
+- Cikti mobil-hazir: dusuk segment (cylinder vert=10, rounded_rect seg=5,
+  pah segment=1) + FLAT shade (ucuz, temiz siluet).
+- `--poly <butce>` (vars. 6000): join sonrasi tri butceyi asarsa Decimate
+  (collapse) ile indirir; tri sayisini RAPORLAR. Cerceve butcesi = yari.
+- Tipik sonuc: tum kapi ~2-3k ucgen (mobil icin ideal). `/tmp/insa_side.png`
+  yan-profil render'i derinligi gozle dogrular.
 
 ## Notlar
 - `--en/--boy` sadece warp hedef **orani** icin; mutlak olcek modelde belirlenir.
@@ -142,6 +154,8 @@ analiz.py artik derinligi TAHMIN etmez, OLCER. harita.json'a yazar:
 ## Gereksinimler
 ```
 pip install --break-system-packages opencv-python-headless numpy \
-    onnxruntime rembg ultralytics torch torchvision
+    onnxruntime rembg ultralytics torch torchvision \
+    transformers timm            # DERINLIK: Depth Anything V2 (ucretsiz)
 ```
-Modeller ilk kullanimda iner: rembg `u2net` (~170MB), `FastSAM-s.pt` (~23MB).
+Modeller ilk kullanimda iner: rembg `u2net` (~170MB), `FastSAM-s.pt` (~23MB),
+`Depth-Anything-V2-Small-hf` (~50-100MB, CPU'da ~1-3sn cikarim). Hepsi ucretsiz.
