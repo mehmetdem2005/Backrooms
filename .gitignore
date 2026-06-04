@@ -1,3 +1,7 @@
 dist/backrooms_lekeleyici_addon.zip
 .godot/
 dist/
+
+# ML model agirliklari (ilk kullanimda iner)
+*.pt
+FastSAM*.pt
