@@ -46,8 +46,42 @@ major=5x + eksen etiketleri), `ogeler.png` (oge+alt_oge+civata cizimli),
 ## Detayli okuma (detay ATLAMA)
 ML kutulari kabasını verir; INCE detay (vida konumu, slat sayisi, ic cubuk
 sinirlari) **zoom/oge_*.png** uzerinden GLOBAL nx,ny grid'iyle gozle birebir
-okunur. Grunge'da Hough vidalari kacirabilir -> zoom-grid otorite. Modelleme
-scriptine bu okunan degerleri gir; hicbir alt-yapiyi atlamadan parca parca kur.
+okunur. Grunge'da Hough vidalari kacirabilir -> zoom-grid otorite.
+
+## GENEL OTOMATIK INSA — insa.py (objeye-ozel sabit YOK)
+`harita.json` + `outline.json`'u OKUYUP modeli kendisi kurar; her referans
+icin calisir, elle olcu girmeye/objeye-ozel script yazmaya gerek YOK:
+```
+blender -b -P insa.py -- <analiz_cikti_dizini> [--boy 2.05] [--out models]
+```
+Tur-surumlu (type-driven) insa, tamamen haritadan:
+- siluet `outline` -> cok-kademeli cerceve (pervaz -> oluk kanali -> panel)
+- panel (leaf) -> acikligi doldurur
+- her `ic_oge` etiket/oran/`alt_ogeler`'e gore otomatik secilir:
+  - `dikey_pencere`/uzun-dar -> oct CIFT cerceve girinti + cam + cevre PERCIN
+  - `vent`/`izgara_sayisi>=2` -> oct sig girinti + N yatay izgara
+  - `kabarik dikey_cubuk` alt-ogesi olan -> DERIN cep + KAPSUL pull-bar (kapi kolu)
+  - buyuk + icinde baska oge olan -> KABARIK plaka (cocuklar uzerine girinti)
+  - diger -> girintili cep
+- `civatalar`/global -> kubbeli silindir (konum/yaricap haritadan)
+- derinlikler EN/BOY olcegine ORANLI (her boyuta uyar); kenarlar temizle()+
+  genel_pah() ile temiz. Cikti: `<out>/model_cerceve.glb`, `model_govde.glb`,
+  `/tmp/insa_preview.png`, `/tmp/insa_front.png` (dogrula.py icin ortho on).
+
+### Uctan-uca akis (yeni obje icin tek komut zinciri)
+```
+export YOLO_CONFIG_DIR=/tmp/ultra MPLCONFIGDIR=/tmp/mpl
+python3 analiz.py <gorsel> <cikti>                 # detayli harita
+blender -b -P insa.py -- <cikti> --boy 2.05        # haritadan otomatik model
+python3 dogrula.py <cikti>/rectified_temiz.png /tmp/insa_front.png fark.png
+```
+Detay eksikse: once analiz.py'nin detay tespitini iyilestir (genel), gerekiyorsa
+zoom-grid'den okunan degeri harita.json'a el ile ekle -> insa.py onu kullanir.
+Tek bir objeye-ozel modelleme scripti yazma; iyilestirmeyi PIPELINE'a yap.
+
+## Ornek (referans): tools/kapi_uretici/kapi_olustur.py
+Bu sci-fi kapi icin elle-ayarlı somut ornek (insa.py'nin urettigi yapilarin
+nasil gorunmesi gerektigini gosterir). Yeni objelerde insa.py'yi kullan.
 
 Otomatik koseler kayarsa elle ver:
 ```
