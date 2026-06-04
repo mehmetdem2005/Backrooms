@@ -71,9 +71,22 @@ lo, hi = np.percentile(resid[m], 2), np.percentile(resid[m], 98)
 d = np.clip((resid - lo) / max(hi - lo, 1e-6), 0, 1)   # 0..1, 1=kabarik
 d[~m] = 0.0                                          # silüet disi = arka
 
-# hafif kenar-koruyan yumusatma (gurultu azalt, yapi korunur)
-d = cv2.bilateralFilter(d.astype(np.float32), 7, 0.08, 5)
+# --- AAA cila: yapi-koruyan gurultu temizligi (metal yuzey duz, kenarlar keskin) ---
+d = d.astype(np.float32)
+# 1) speckle/benek temizligi
+d = cv2.medianBlur((d*255).astype(np.uint8), 5).astype(np.float32)/255.0
+# 2) kenar-koruyan yumusatma (duz alanlar duz, yapisal kenarlar korunur)
+for _ in range(3):
+    d = cv2.bilateralFilter(d, 9, 0.12, 9)
+# 3) albedo kenarlariyla yonlendirilmis ince detay (yapi netligi)
+guide = cv2.cvtColor(alb, cv2.COLOR_BGR2GRAY)
+d = cv2.ximgproc.jointBilateralFilter(guide, d, 9, 0.10, 9) if hasattr(cv2, "ximgproc") else d
 d[~m] = 0.0
+# 4) silhouette kenarini temiz tut: en dis ince bandi maske-ici medyan'a cek
+er = cv2.erode(m.astype(np.uint8)*255, np.ones((9, 9), np.uint8), 1) > 0
+kenar = m & ~er
+if kenar.sum() > 0 and er.sum() > 0:
+    d[kenar] = float(np.median(d[er]))
 
 cv2.imwrite(os.path.join(DIR, "depth16.png"), (d * 65535).astype(np.uint16))
 cv2.imwrite(os.path.join(DIR, "depth_view.png"), (d * 255).astype(np.uint8))
