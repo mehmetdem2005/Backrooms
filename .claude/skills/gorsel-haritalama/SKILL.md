@@ -12,9 +12,12 @@ Amac: referans gorseli "bakip hatirlayarak" degil, **olcerek** modellemek.
    maskesi. (Otsu esiklemesi grunge dokuda kayar; rembg kaymaz.)
 2. **Sanal kose + rectify** -> siluetin 6-nokta poligonundan yan/ust kenarlari
    uzatip on-yuz dikdortgeninin koselerini bulur, perspektifi ON YUZE duzeltir.
-3. **FastSAM (segment-everything)** -> duzlestirilmis on yuzde her ic ogeyi
-   (pencere, vent, yuva, dugme) maske olarak bulur; kesin sinir kutulari verir.
-4. `harita.json` + dogrulama gorselleri yazar.
+3. **FastSAM (segment-everything)** -> her ic ogeyi (pencere, vent, yuva) maske
+   olarak bulur; kaba sinir kutulari verir.
+4. **ALT-PIKSEL kesinlestirme** -> her kutunun 4 kenarini gradyan profili +
+   parabolik interpolasyon ile alt-piksel hassasiyetine getirir (SAM maskesi
+   blok-blok olsa da kenar konumu tam). Vent icin yatay izgara sayisini olcer.
+5. `harita.json` (sub-piksel ic_ogeler) + dogrulama gorselleri yazar.
 
 ## Kullanim
 ```
@@ -41,6 +44,16 @@ python3 analiz.py <gorsel> <cikti> --koseler "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"
    model_z =  2.10 - ny*2.10        # ust(ny=0)->z=2.10
    ```
    `siluet_rectified_normalize` ust pah (chamfer) olcumu icin kullanilir.
+
+4. **KAPATMA DONGUSU (en hassas adim) — dogrula.py:** modeli olusturduktan
+   sonra ORTOGRAFIK ON render'ini al (objenin on yuzune dik bakan ortho kamera,
+   arka plan saydam, kadraj on yuzu tam dolduracak). Sonra:
+   ```
+   python3 dogrula.py <cikti>/rectified_temiz.png <model_front.png> fark.png
+   ```
+   Kirmizi = modelin kenarlari; referans ozellikleri uzerine OTURMAYAN yerler
+   sapmadir. fark.png'i Read et, sapan olcuyu duzelt, yeniden uret/dogrula.
+   Boylece goz karari kalmaz; model referansa piksel piksel hizalanir.
 
 ## Notlar
 - `--en/--boy` sadece warp hedef **orani** icin; mutlak olcek modelde belirlenir.

@@ -105,8 +105,8 @@ mesh = bpy.data.meshes.new("cerceve_mesh")
 obj_c = bpy.data.objects.new("Cerceve", mesh)
 bpy.context.collection.objects.link(obj_c)
 bm = bmesh.new()
-pts = [(-0.55, 0.00), (-0.55, 1.90), (-0.418, 2.10),
-       ( 0.418, 2.10), ( 0.55, 1.90), ( 0.55, 0.00)]
+pts = [(-0.55, 0.00), (-0.55, 1.91), (-0.418, 2.10),
+       ( 0.418, 2.10), ( 0.55, 1.91), ( 0.55, 0.00)]
 vs = [bm.verts.new((x, 0.0, z)) for x, z in pts]
 f = bm.faces.new(vs)
 r = bmesh.ops.extrude_face_region(bm, geom=[f])
@@ -116,14 +116,14 @@ bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 bm.to_mesh(mesh); bm.free()
 
 # Ic aciklik: x[-0.41,0.41], z[0.185,1.90]
-boolean(obj_c, add_box("cut_op", -0.41, 0.41, 0.185, 1.90, -0.10, 0.30))
+boolean(obj_c, add_box("cut_op", -0.395, 0.395, 0.205, 1.90, -0.10, 0.30))
 recalc(obj_c)
 
 # EGIM: ic on kenari genis pahla
 def _on(c): return c.y <= EPS
 def _aci(c):
-    if yakin(abs(c.x), 0.41) and (0.18 <= c.z <= 1.905): return True
-    if (yakin(c.z, 0.185) or yakin(c.z, 1.90)) and (abs(c.x) <= 0.415): return True
+    if yakin(abs(c.x), 0.395) and (0.20 <= c.z <= 1.905): return True
+    if (yakin(c.z, 0.205) or yakin(c.z, 1.90)) and (abs(c.x) <= 0.40): return True
     return False
 bevel_edges(obj_c, lambda a, b: _on(a) and _on(b) and _aci(a) and _aci(b),
             offset=0.06, segments=1)
@@ -133,10 +133,10 @@ unwrap(obj_c)
 
 # ================================================================ KANAT
 # Panel: x[-0.395,0.395], z[0.20,1.885]
-obj_k = add_box("Kanat", -0.395, 0.395, 0.20, 1.885, 0.030, 0.115)
+obj_k = add_box("Kanat", -0.388, 0.388, 0.215, 1.89, 0.030, 0.115)
 
 # --- Dikey oktagonal pencere (SAM): x[-0.292,-0.099] z[0.89,1.81] ---
-WX0, WX1, WZ0, WZ1 = -0.292, -0.099, 0.89, 1.81
+WX0, WX1, WZ0, WZ1 = -0.289, -0.110, 0.899, 1.817
 boolean(obj_k, add_prism("cutV", cham_rect(WX0, WX1, WZ0, WZ1, 0.027), -0.05, 0.085))
 recalc(obj_k)
 obj_k.data.materials.append(mat_kanat)
@@ -153,34 +153,34 @@ bevel_edges(obj_k, lambda a, b: _onk(a) and _onk(b)
             offset=0.016, segments=1)
 # panel dis cevre on kenarini hafifce pahla
 bevel_edges(obj_k, lambda a, b: _onk(a) and _onk(b)
-            and _rect_kenar(a, -0.395, 0.395, 0.20, 1.885)
-            and _rect_kenar(b, -0.395, 0.395, 0.20, 1.885),
+            and _rect_kenar(a, -0.388, 0.388, 0.215, 1.89)
+            and _rect_kenar(b, -0.388, 0.388, 0.215, 1.89),
             offset=0.012, segments=1)
 recalc(obj_k)
 
 ekler = []
 
 # --- Cam (pencere arkasi) ---
-gv = add_prism("camV", cham_rect(-0.284, -0.107, 0.90, 1.80, 0.025), 0.066, 0.078)
+gv = add_prism("camV", cham_rect(-0.281, -0.118, 0.909, 1.807, 0.024), 0.066, 0.078)
 gv.data.materials.append(mat_cam); ekler.append(gv)
 
 # --- Kabarik arka plaka (vent+slot altinda, SAM 0.052 bolgesi): x[0.17,0.37] z[0.71,1.27]
-plaka = add_box("Plaka", 0.17, 0.37, 0.71, 1.27, -0.006, 0.04)
+plaka = add_box("Plaka", 0.165, 0.365, 0.707, 1.280, -0.006, 0.04)
 bevel_edges(plaka, lambda a, b: (a.y <= -0.006+EPS) and (b.y <= -0.006+EPS),
             offset=0.006, segments=1)
 recalc(plaka); plaka.data.materials.append(mat_kanat); ekler.append(plaka)
 
 # --- VENT (izgarali, kabarik) (SAM): x[0.204,0.33] z[1.08,1.232]
-vent = add_box("Vent", 0.204, 0.33, 1.08, 1.232, -0.020, 0.04)
-for zc in (1.097, 1.134, 1.171, 1.208):
-    boolean(vent, add_box("ol", 0.216, 0.318, zc-0.009, zc+0.009, -0.05, 0.004))
+vent = add_box("Vent", 0.200, 0.332, 1.098, 1.232, -0.020, 0.04)
+for zc in (1.110, 1.134, 1.158, 1.182, 1.206):  # 5 izgara (olculen)
+    boolean(vent, add_box("ol", 0.212, 0.320, zc-0.007, zc+0.007, -0.05, 0.004))
 bevel_edges(vent, lambda a, b: (a.y <= -0.020+EPS) and (b.y <= -0.020+EPS),
             offset=0.005, segments=1)
 recalc(vent); vent.data.materials.append(mat_kanat); ekler.append(vent)
 
 # --- SLOT (hap, girintili) (SAM): x[0.25,0.348] z[0.733,0.985]
-slot = add_prism("Slot", cham_rect(0.25, 0.348, 0.733, 0.985, 0.04), -0.014, 0.04)
-boolean(slot, add_prism("cutS", cham_rect(0.272, 0.326, 0.758, 0.960, 0.028), -0.05, 0.020))
+slot = add_prism("Slot", cham_rect(0.246, 0.365, 0.732, 0.986, 0.042), -0.014, 0.04)
+boolean(slot, add_prism("cutS", cham_rect(0.268, 0.343, 0.757, 0.961, 0.030), -0.05, 0.020))
 bevel_edges(slot, lambda a, b: (a.y <= -0.014+EPS) and (b.y <= -0.014+EPS),
             offset=0.005, segments=1)
 recalc(slot); slot.data.materials.append(mat_kanat); ekler.append(slot)
@@ -220,10 +220,26 @@ sc.render.filepath = "/tmp/kapi_preview.png"
 bpy.ops.render.render(write_still=True)
 print(">>> ONIZLEME: /tmp/kapi_preview.png")
 
+# --- Ortografik ON render (referansla birebir karsilastirma icin) ---
+import math as _m
+camo = bpy.data.objects.new("CamO", bpy.data.cameras.new("CamO"))
+bpy.context.collection.objects.link(camo)
+camo.data.type = 'ORTHO'
+camo.data.ortho_scale = 2.10          # boy = 2.10 m tam sigsin
+camo.location = Vector((0.0, -3.0, 1.05))
+camo.rotation_euler = (_m.radians(90), 0, 0)   # -Z -> +Y (on yuze bak)
+sc.camera = camo
+sc.render.film_transparent = True
+sc.render.resolution_x = 524; sc.render.resolution_y = 1000
+sc.render.filepath = "/tmp/kapi_front.png"
+bpy.ops.render.render(write_still=True)
+sc.render.film_transparent = False
+print(">>> ON ORTO: /tmp/kapi_front.png")
+
 # ================================================================ EXPORT
 os.makedirs(os.path.join(PROJE, "models"), exist_ok=True)
 # kanat origin'ini menteseye (sol kenar, derinlik ortasi) tasi
-bpy.context.scene.cursor.location = Vector((-0.395, 0.0725, 0.0))
+bpy.context.scene.cursor.location = Vector((-0.388, 0.0725, 0.0))
 bpy.ops.object.select_all(action='DESELECT'); obj_k.select_set(True)
 bpy.context.view_layer.objects.active = obj_k
 bpy.ops.object.origin_set(type='ORIGIN_CURSOR')

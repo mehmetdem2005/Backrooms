@@ -135,6 +135,51 @@ def ogeler_cv(rect):
     return out
 
 
+def _subpix(sig, i):
+    if 0 < i < len(sig) - 1:
+        a, b, c = sig[i-1], sig[i], sig[i+1]
+        d = a - 2*b + c
+        if abs(d) > 1e-6:
+            return i + 0.5 * (a - c) / d
+    return float(i)
+
+
+def refine_bbox(gray, x0, y0, x1, y1, m=10, pad=6):
+    """SAM kaba kutusunu gradyan zirvesiyle ALT-PIKSEL kesinlige getir."""
+    H, W = gray.shape
+    px0, px1 = int(x0*W), int(x1*W)
+    py0, py1 = int(y0*H), int(y1*H)
+
+    def dik(px, ya, yb):     # dikey kenar (x) ara
+        prof = np.abs(cv2.Sobel(gray[ya:yb, :], cv2.CV_32F, 1, 0, 3)).mean(0)
+        lo, hi = max(0, px-m), min(W-1, px+m)
+        return _subpix(prof, lo + int(np.argmax(prof[lo:hi]))) / W
+
+    def yat(py, xa, xb):     # yatay kenar (y) ara
+        prof = np.abs(cv2.Sobel(gray[:, xa:xb], cv2.CV_32F, 0, 1, 3)).mean(1)
+        lo, hi = max(0, py-m), min(H-1, py+m)
+        return _subpix(prof, lo + int(np.argmax(prof[lo:hi]))) / H
+
+    L = dik(px0, py0+pad, py1-pad); R = dik(px1, py0+pad, py1-pad)
+    T = yat(py0, px0+pad, px1-pad); B = yat(py1, px0+pad, px1-pad)
+    return L, T, R, B
+
+
+def vent_izgara(gray, x0, y0, x1, y1):
+    """Vent bolgesindeki yatay izgara cizgi sayisini olc."""
+    H, W = gray.shape
+    band = gray[int(y0*H):int(y1*H), int(x0*W):int(x1*W)]
+    if band.size == 0:
+        return 0
+    prof = np.abs(cv2.Sobel(band.astype(np.float32), cv2.CV_32F, 0, 1, 3)).mean(1)
+    try:
+        from scipy.signal import find_peaks
+        pk, _ = find_peaks(prof, distance=4, height=prof.max()*0.3)
+        return int(round(len(pk) / 2))   # her olukta 2 kenar
+    except Exception:
+        return 0
+
+
 def _dedupe(feats):
     feats = sorted(feats, key=lambda f: -f[0])
     sel = []
@@ -200,15 +245,28 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
         feats = ogeler_cv(rect); okaynak = "opencv(%s)" % type(e).__name__
     feats = _dedupe(feats)
 
+    # ALT-PIKSEL kesinlestirme (SAM kaba kutu -> gradyan kenari)
+    gray = cv2.GaussianBlur(cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY), (3, 3), 0).astype(np.float32)
     ogeler = []
     for a, x0, y0, x1, y1 in sorted(feats, key=lambda f: f[2]):
-        ogeler.append({
-            "etiket": _etiket(x0, y0, x1, y1),
+        try:
+            rx0, ry0, rx1, ry1 = refine_bbox(gray, x0, y0, x1, y1)
+            if rx1 > rx0 and ry1 > ry0:
+                x0, y0, x1, y1 = rx0, ry0, rx1, ry1
+        except Exception:
+            pass
+        x0, y0, x1, y1 = float(x0), float(y0), float(x1), float(y1)
+        et = _etiket(x0, y0, x1, y1)
+        d = {
+            "etiket": et,
             "x": round(x0, 4), "y": round(y0, 4),
             "x1": round(x1, 4), "y1": round(y1, 4),
             "w": round(x1 - x0, 4), "h": round(y1 - y0, 4),
-            "alan": round(a, 4),
-        })
+            "alan": round(float(a), 4),
+        }
+        if et == "vent":
+            d["izgara_sayisi"] = int(vent_izgara(gray, x0, y0, x1, y1))
+        ogeler.append(d)
 
     harita = {
         "kaynak": os.path.basename(gorsel),
