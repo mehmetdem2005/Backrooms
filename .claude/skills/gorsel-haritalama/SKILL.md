@@ -19,17 +19,35 @@ Amac: referans gorseli "bakip hatirlayarak" degil, **olcerek** modellemek.
    olarak bulur; kaba sinir kutulari verir.
 4. **ALT-PIKSEL kesinlestirme** -> her kutunun 4 kenarini gradyan profili +
    parabolik interpolasyon ile alt-piksel hassasiyetine getirir (SAM maskesi
-   blok-blok olsa da kenar konumu tam). Vent icin yatay izgara sayisini olcer.
-5. `harita.json` (sub-piksel ic_ogeler) + dogrulama gorselleri yazar.
+   blok-blok olsa da kenar konumu tam).
+5. **DETAY KATMANI (yeni)** -> her ic oge icin:
+   - `alt_ogeler`: ic-ice KABARIK (parlak) / GIRINTILI (koyu) alt-yapilari bulur
+     (slot icindeki dikey kulp cubugu, vent oct alt-cerceve, ic cep). CLAHE +
+     parlaklik kontrasti + kontur; sekil = dikey_cubuk / yatay_cubuk / cep.
+   - `izgara_sayisi`: vent oluk (slat) sayisini satir-parlaklik salinimindan olcer.
+   - `civatalar`: CIVATA/RIVET tespiti. HoughCircles + **radyal kontrast
+     dogrulamasi** (ic disk ile cevre halka arasi net kontrast + dusuk ic-varyans)
+     -> grunge lekelerini eler, sadece gercek vidalar kalir.
+6. `harita.json` (sub-piksel ic_ogeler + alt_ogeler + civatalar) + INCE etiketli
+   grid + her oge icin otomatik ZOOM-GRID dogrulama gorselleri yazar.
 
 ## Kullanim
 ```
 # YOLO/matplotlib yazma dizinleri (gerekli):
 export YOLO_CONFIG_DIR=/tmp/ultra MPLCONFIGDIR=/tmp/mpl
 python3 analiz.py <gorsel> <cikti> --en 1.1 --boy 2.1
+python3 analiz.py <gorsel> <cikti> --grid 0.02   # grid minor araligi (vars. 0.01)
 ```
 Uretilenler: `harita.json`, `mask.png`, `overlay.png` (orijinal+siluet+koseler),
-`rectified_temiz.png`, `rectified_grid.png`, `ogeler.png` (tespitli on yuz).
+`rectified_temiz.png`, `rectified_grid.png` (INCE etiketli: minor=grid_adim,
+major=5x + eksen etiketleri), `ogeler.png` (oge+alt_oge+civata cizimli),
+`zoom/oge_*.png` (her ic oge icin yakin GLOBAL-koordinatli ince grid).
+
+## Detayli okuma (detay ATLAMA)
+ML kutulari kabasını verir; INCE detay (vida konumu, slat sayisi, ic cubuk
+sinirlari) **zoom/oge_*.png** uzerinden GLOBAL nx,ny grid'iyle gozle birebir
+okunur. Grunge'da Hough vidalari kacirabilir -> zoom-grid otorite. Modelleme
+scriptine bu okunan degerleri gir; hicbir alt-yapiyi atlamadan parca parca kur.
 
 Otomatik koseler kayarsa elle ver:
 ```
@@ -52,11 +70,15 @@ python3 analiz.py <gorsel> <cikti> --koseler "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"
    sonra ORTOGRAFIK ON render'ini al (objenin on yuzune dik bakan ortho kamera,
    arka plan saydam, kadraj on yuzu tam dolduracak). Sonra:
    ```
-   python3 dogrula.py <cikti>/rectified_temiz.png <model_front.png> fark.png
+   python3 dogrula.py <cikti>/rectified_temiz.png <model_front.png> fark.png --grid 0.05
    ```
-   Kirmizi = modelin kenarlari; referans ozellikleri uzerine OTURMAYAN yerler
-   sapmadir. fark.png'i Read et, sapan olcuyu duzelt, yeniden uret/dogrula.
-   Boylece goz karari kalmaz; model referansa piksel piksel hizalanir.
+   KIRMIZI = modelin kenarlari, YESIL = referans kenarlari (ust uste; hizalama
+   net gorunur). INCE etiketli grid ile sapan olcuyu okursun. Cikti sayisal:
+   `model->ref ortusme`, `ref->model kapsama`, ve ust/orta/alt bant icin
+   `eksik` (referansta olup modelde olmayan = ATLANAN detay). fark.png'i Read et,
+   sapan/eksik olcuyu duzelt, yeniden uret/dogrula. Not: referansin grunge
+   dokusu yuzunden ham `kapsama` dusuk cikar; ONEMLI olan model kenarinin
+   YAPISAL referans ozelliklerine oturmasi + `eksik` bandinin dusuk olmasi.
 
 ## Derinlik / cerceve profili (3B akil yurutme)
 - `harita.json -> kamera`: focal, yaw, pitch, px_per_m. 3/4 acida yan/ust yuz

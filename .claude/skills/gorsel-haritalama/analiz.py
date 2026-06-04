@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gorsel -> hassas sekil/oran haritalama araci (ML destekli).
+Gorsel -> hassas sekil/oran haritalama araci (ML destekli, DETAYLI surum).
 
 Pipeline:
   1) rembg (U^2-Net) ile arka plani ayir -> TEMIZ siluet maskesi
@@ -9,11 +9,15 @@ Pipeline:
      koselerini bul -> perspektifi ON YUZE duzelt (rectify)
   3) FastSAM (segment-everything) ile duzlestirilmis on yuzde ic ogeleri
      (pencere, vent, dugme, yuva) piksel hassasiyetinde segment et
-  4) Hepsini [0..1] normalize edip harita.json'a yaz; dogrulama gorselleri uret
+  4) HER ic oge icin: alt-piksel kenar + IC-ICE alt-ogeler (kabarik cubuk,
+     girintili cep, alt-cerceve) + izgara sayisi + CIVATA/RIVET tespiti
+  5) Hepsini [0..1] normalize edip harita.json'a yaz; INCE ETIKETLI grid +
+     her oge icin otomatik zoom-grid dogrulama gorselleri uret
 
 Kullanim:
   python3 analiz.py <gorsel> <cikti> [--en 1.1] [--boy 2.1]
   python3 analiz.py <gorsel> <cikti> --koseler "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"
+  python3 analiz.py <gorsel> <cikti> --grid 0.02   # grid araligi (vars. 0.01)
 
 rembg/ultralytics yoksa otomatik Otsu + OpenCV yedegine duser.
 """
@@ -107,7 +111,7 @@ def en_boy_orani(kose, W, H):
 
 def kamera_poz(kose, en, boy, W, H):
     """Focal + kamera pozu (solvePnP). Derinlik/3B akil yurutme icin.
-    Doner: {focal, mesafe_m, yaw_deg, pitch_deg, px_per_m_sol}."""
+    Doner: {focal, mesafe_m, yaw_deg, pitch_deg, px_per_m}."""
     tl, tr, br, bl = [np.asarray(p, float) for p in kose]
     u0, v0 = W/2.0, H/2.0
     m1 = np.array([tl[0], tl[1], 1.0]); m2 = np.array([tr[0], tr[1], 1.0])
@@ -226,18 +230,131 @@ def refine_bbox(gray, x0, y0, x1, y1, m=10, pad=6):
 
 
 def vent_izgara(gray, x0, y0, x1, y1):
-    """Vent bolgesindeki yatay izgara cizgi sayisini olc."""
+    """Vent bolgesindeki yatay izgara cizgi (oluk) sayisini sag-lam olc.
+    Ic banttan (kenar pahlarini disla) profil al, zirve grupla."""
     H, W = gray.shape
-    band = gray[int(y0*H):int(y1*H), int(x0*W):int(x1*W)]
-    if band.size == 0:
+    # ic banti hafif kucult: yanlardan cerceve pahini disla, dikeyde TAM al
+    dx = (x1 - x0) * 0.14; dy = (y1 - y0) * 0.04
+    band = gray[int((y0+dy)*H):int((y1-dy)*H), int((x0+dx)*W):int((x1-dx)*W)]
+    if band.size == 0 or band.shape[0] < 6:
         return 0
-    prof = np.abs(cv2.Sobel(band.astype(np.float32), cv2.CV_32F, 0, 1, 3)).mean(1)
+    # her satirin ortalama parlakligi: oluk(koyu)/rib(parlak) salinimi
+    sat = band.astype(np.float32).mean(1)
+    sat = cv2.GaussianBlur(sat.reshape(-1, 1), (1, 3), 0).ravel()
     try:
         from scipy.signal import find_peaks
-        pk, _ = find_peaks(prof, distance=4, height=prof.max()*0.3)
-        return int(round(len(pk) / 2))   # her olukta 2 kenar
+        rng = sat.max() - sat.min()
+        if rng < 6:
+            return 0
+        dist = max(2, band.shape[0] // 14)
+        # oluk = parlaklik minimumu (ters profil zirvesi)
+        pk, _ = find_peaks(sat.max() - sat, distance=dist, prominence=rng*0.18)
+        return int(len(pk))
     except Exception:
         return 0
+
+
+# ---------------------------------------------------- CIVATA / RIVET tespiti
+def _civata_skoru(s, cx, cy, r):
+    """Aday dairenin GERCEK civata olma skoru: ic disk ile cevre halka
+    arasi net kontrast + dusuk ic-varyans (duzgun disk) + kenar gradyani."""
+    H, W = s.shape
+    cx, cy, r = int(cx), int(cy), int(max(2, r))
+    if cx-2*r < 0 or cy-2*r < 0 or cx+2*r >= W or cy+2*r >= H:
+        return 0.0
+    yy, xx = np.ogrid[cy-2*r:cy+2*r+1, cx-2*r:cx+2*r+1]
+    d = np.sqrt((xx-cx)**2 + (yy-cy)**2)
+    patch = s[cy-2*r:cy+2*r+1, cx-2*r:cx+2*r+1].astype(np.float32)
+    ic = patch[d <= r*0.6]
+    halka = patch[(d >= r*1.1) & (d <= r*1.8)]
+    if ic.size < 4 or halka.size < 4:
+        return 0.0
+    kontrast = abs(float(ic.mean()) - float(halka.mean()))
+    duzgun = max(0.0, 1.0 - float(ic.std()) / 40.0)   # ic ne kadar duz
+    return kontrast * duzgun
+
+
+def tespit_civata(gray, x0, y0, x1, y1, rmin=3, rmax=11, esik=20.0, max_say=24):
+    """Bir bolgedeki civata/rivet (kucuk daire) konumlarini bul.
+    Grunge'a karsi: CLAHE + HoughCircles -> RADYAL KONTRAST dogrulamasi.
+    Sadece duzgun disk + cevreyle net kontrast veren adaylar kalir."""
+    H, W = gray.shape
+    px0, py0 = int(x0*W), int(y0*H)
+    sub = gray[py0:int(y1*H), px0:int(x1*W)]
+    if sub.size == 0:
+        return []
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    s = clahe.apply(sub)
+    sb = cv2.medianBlur(s, 3)
+    aday = []
+    for p2 in (22, 18, 15):
+        c = cv2.HoughCircles(sb, cv2.HOUGH_GRADIENT, dp=1, minDist=12,
+                             param1=100, param2=p2, minRadius=rmin, maxRadius=rmax)
+        if c is not None:
+            for cx, cy, r in c[0]:
+                aday.append((cx, cy, r))
+            if len(aday) >= 6:
+                break
+    # RADYAL dogrulama + skor
+    skorlu = []
+    for cx, cy, r in aday:
+        sk = _civata_skoru(s, cx, cy, r)
+        if sk >= esik:
+            skorlu.append((sk, (px0+cx)/W, (py0+cy)/H, r/W))
+    skorlu.sort(key=lambda t: -t[0])
+    sel = []
+    for sk, gx, gy, gr in skorlu:
+        if all((gx-b[0])**2 + (gy-b[1])**2 > (0.012)**2 for b in sel):
+            sel.append((gx, gy, gr))
+        if len(sel) >= max_say:
+            break
+    return [[round(float(a), 4), round(float(bb), 4), round(float(rr), 4)]
+            for a, bb, rr in sel]
+
+
+# ---------------------------------------------------- IC-ICE alt-ogeler
+def alt_ogeler(rect, x0, y0, x1, y1):
+    """Bir oge kutusu icinde KABARIK/GIRINTILI alt-yapilari bul:
+    - kabarik dikey/yatay cubuk (handle/rail)  - alt-cerceve  - ic cep
+    Parlaklik kontrasti + kontur ile; [0..1] normalize bbox + tur doner."""
+    H, W = rect.shape[:2]
+    g = cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY)
+    px0, py0, px1, py1 = int(x0*W), int(y0*H), int(x1*W), int(y1*H)
+    sub = g[py0:py1, px0:px1]
+    if sub.size == 0 or min(sub.shape) < 8:
+        return []
+    sw, sh = sub.shape[1], sub.shape[0]
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(6, 6))
+    s = clahe.apply(sub)
+    med = float(np.median(s))
+    alt = []
+    # KABARIK (parlak) ve GIRINTILI (koyu) bolgeleri ayri yakala
+    for tur, m in (("kabarik", cv2.inRange(s, int(med+22), 255)),
+                   ("girinti", cv2.inRange(s, 0, int(med-22)))):
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        m = cv2.morphologyEx(m, cv2.MORPH_OPEN, k, 1)
+        m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k, 2)
+        cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in cnts:
+            a = cv2.contourArea(c) / float(sw*sh)
+            if not (0.03 < a < 0.7):
+                continue
+            bx, by, bw, bh = cv2.boundingRect(c)
+            # kenara yapisik veya cok ince olanlari ele
+            if bw < sw*0.06 or bh < sh*0.06:
+                continue
+            nx0 = x0 + bx/sw*(x1-x0); ny0 = y0 + by/sh*(y1-y0)
+            nx1 = x0 + (bx+bw)/sw*(x1-x0); ny1 = y0 + (by+bh)/sh*(y1-y0)
+            oran = bw/max(bh, 1)
+            sekil = ("dikey_cubuk" if oran < 0.5 else
+                     "yatay_cubuk" if oran > 2.0 else "cep")
+            alt.append({"tur": tur, "sekil": sekil,
+                        "x": round(nx0, 4), "y": round(ny0, 4),
+                        "x1": round(nx1, 4), "y1": round(ny1, 4),
+                        "alan": round(float(a), 3)})
+    # alan'a gore buyukten kucuge, en fazla 4 (gurultuyu sinirleyici)
+    alt.sort(key=lambda d: -d["alan"])
+    return alt[:4]
 
 
 def _dedupe(feats):
@@ -268,8 +385,65 @@ def _etiket(x0, y0, x1, y1):
     return "oge"
 
 
+# ---------------------------------------------------- INCE ETIKETLI GRID
+def ince_grid(img, adim=0.01, buyut=1):
+    """[0..1] uzerine ince (minor=adim) + kalin (major=5*adim) etiketli grid."""
+    o = img.copy()
+    if buyut != 1:
+        o = cv2.resize(o, (o.shape[1]*buyut, o.shape[0]*buyut),
+                       interpolation=cv2.INTER_NEAREST)
+    H, W = o.shape[:2]
+    nmaj = int(round(0.05 / adim)) if adim > 0 else 5
+    n = int(round(1.0 / adim))
+    for i in range(0, n+1):
+        v = i * adim
+        px = int(round(v * (W-1))); py = int(round(v * (H-1)))
+        major = (i % nmaj == 0)
+        col = (0, 150, 255) if major else (55, 80, 110)
+        cv2.line(o, (px, 0), (px, H), col, 1)
+        cv2.line(o, (0, py), (W, py), col, 1)
+        if major:
+            cv2.putText(o, "%.2f" % v, (min(px+1, W-26), 11),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(o, "%.2f" % v, (1, max(py-2, 9)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 255, 255), 1, cv2.LINE_AA)
+    return o
+
+
+def oge_zoom_grid(rect, x0, y0, x1, y1, ad, ekstra=0.04):
+    """Bir oge cevresini kirpip ince GLOBAL-etiketli grid bas (gozle okuma)."""
+    H, W = rect.shape[:2]
+    gx0 = max(0.0, x0-ekstra); gy0 = max(0.0, y0-ekstra)
+    gx1 = min(1.0, x1+ekstra); gy1 = min(1.0, y1+ekstra)
+    c = rect[int(gy0*H):int(gy1*H), int(gx0*W):int(gx1*W)].copy()
+    if c.size == 0:
+        return None
+    S = max(2, int(420 / max(c.shape[1], 1)))
+    c = cv2.resize(c, (c.shape[1]*S, c.shape[0]*S), interpolation=cv2.INTER_CUBIC)
+    Hc, Wc = c.shape[:2]
+    v = np.ceil(gx0/ad)*ad
+    while v < gx1:
+        px = int((v-gx0)/(gx1-gx0)*Wc)
+        maj = round(v/ad) % 5 == 0
+        cv2.line(c, (px, 0), (px, Hc), (0, 150, 255) if maj else (55, 80, 110), 1)
+        if maj:
+            cv2.putText(c, "%.2f" % v, (px+1, 11), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.3, (0, 255, 255), 1, cv2.LINE_AA)
+        v += ad
+    v = np.ceil(gy0/ad)*ad
+    while v < gy1:
+        py = int((v-gy0)/(gy1-gy0)*Hc)
+        maj = round(v/ad) % 5 == 0
+        cv2.line(c, (0, py), (Wc, py), (0, 150, 255) if maj else (55, 80, 110), 1)
+        if maj:
+            cv2.putText(c, "%.2f" % v, (1, py-2), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.3, (0, 255, 255), 1, cv2.LINE_AA)
+        v += ad
+    return c
+
+
 # --------------------------------------------------------------- ana akis
-def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
+def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None, grid_adim=0.01):
     os.makedirs(cikti, exist_ok=True)
     img = cv2.imread(gorsel)
     if img is None:
@@ -328,6 +502,7 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
 
     # ALT-PIKSEL kesinlestirme (SAM kaba kutu -> gradyan kenari)
     gray = cv2.GaussianBlur(cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY), (3, 3), 0).astype(np.float32)
+    gray8 = cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY)
     ogeler = []
     for a, x0, y0, x1, y1 in sorted(feats, key=lambda f: f[2]):
         try:
@@ -347,7 +522,19 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
         }
         if et == "vent":
             d["izgara_sayisi"] = int(vent_izgara(gray, x0, y0, x1, y1))
+        # IC-ICE alt-ogeler (kabarik cubuk / cep / alt-cerceve)
+        alt = alt_ogeler(rect, x0, y0, x1, y1)
+        if alt:
+            d["alt_ogeler"] = alt
+        # her ogenin civatalarini bolgesel olarak ara
+        cv = tespit_civata(gray8, max(0, x0-0.02), max(0, y0-0.02),
+                           min(1, x1+0.02), min(1, y1+0.02))
+        if cv:
+            d["civatalar"] = cv
         ogeler.append(d)
+
+    # TUM on yuzde civata/rivet haritasi (genel)
+    civatalar = tespit_civata(gray8, 0.05, 0.05, 0.95, 0.97)
 
     harita = {
         "kaynak": os.path.basename(gorsel),
@@ -358,12 +545,15 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
         "maske_kaynak": mkaynak,
         "oge_kaynak": okaynak,
         "kose_kaynak": "manuel" if manuel_kose is not None else "rembg_sanal",
+        "grid_adim": grid_adim,
         "sanal_koseler_px": kose.tolist(),
         "rectified_boyut": [Wt, Ht],
         "siluet_rectified_normalize": sil_n,
         "ic_ogeler": ogeler,
+        "civatalar_global": civatalar,
         "kamera": kamera_poz(kose, en, boy, W, H),
-        "not": "ic_ogeler ve siluet ON YUZE duzlestirilmis [0..1] normalize.",
+        "not": "ic_ogeler/siluet/civata ON YUZE duzlestirilmis [0..1] normalize. "
+               "alt_ogeler her ic ogenin kabarik/girintili alt-yapilari.",
     }
     with open(os.path.join(cikti, "harita.json"), "w") as f:
         json.dump(harita, f, indent=2, ensure_ascii=False)
@@ -375,11 +565,9 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
         cv2.circle(ov, tuple(np.int32(p)), 9, (0, 0, 255), -1)
     cv2.imwrite(os.path.join(cikti, "overlay.png"), ov)
 
-    rg = rect.copy()
-    for i in range(1, 10):
-        cv2.line(rg, (int(i/10*Wt), 0), (int(i/10*Wt), Ht), (0, 140, 255), 1)
-        cv2.line(rg, (0, int(i/10*Ht)), (Wt, int(i/10*Ht)), (0, 140, 255), 1)
-    cv2.imwrite(os.path.join(cikti, "rectified_grid.png"), rg)
+    # INCE etiketli grid (tum on yuz)
+    cv2.imwrite(os.path.join(cikti, "rectified_grid.png"),
+                ince_grid(rect, grid_adim))
 
     rv = rect.copy()
     renk = {"dikey_pencere": (255, 80, 80), "vent": (80, 200, 255),
@@ -390,12 +578,35 @@ def analiz(gorsel, cikti, en=1.1, boy=2.1, manuel_kose=None):
                       (int(o["x1"]*Wt), int(o["y1"]*Ht)), c, 2)
         cv2.putText(rv, o["etiket"], (int(o["x"]*Wt), max(0, int(o["y"]*Ht)-5)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, c, 1, cv2.LINE_AA)
+        for al in o.get("alt_ogeler", []):
+            ac = (0, 255, 255) if al["tur"] == "kabarik" else (255, 0, 255)
+            cv2.rectangle(rv, (int(al["x"]*Wt), int(al["y"]*Ht)),
+                          (int(al["x1"]*Wt), int(al["y1"]*Ht)), ac, 1)
+    for b in civatalar:
+        cv2.circle(rv, (int(b[0]*Wt), int(b[1]*Ht)), max(2, int(b[2]*Wt)),
+                   (0, 255, 0), 2)
     cv2.imwrite(os.path.join(cikti, "ogeler.png"), rv)
 
-    print("maske:", mkaynak, "| oge:", okaynak, "| oge sayisi:", len(ogeler))
+    # her ic oge icin otomatik ZOOM-GRID (gozle hassas okuma)
+    zdir = os.path.join(cikti, "zoom")
+    os.makedirs(zdir, exist_ok=True)
+    for i, o in enumerate(ogeler):
+        z = oge_zoom_grid(rect, o["x"], o["y"], o["x1"], o["y1"], grid_adim)
+        if z is not None:
+            cv2.imwrite(os.path.join(zdir, "oge_%d_%s.png" % (i, o["etiket"])), z)
+
+    print("maske:", mkaynak, "| oge:", okaynak, "| oge sayisi:", len(ogeler),
+          "| global civata:", len(civatalar))
     for o in ogeler:
-        print("  {etiket:14s} x[{x:.3f},{x1:.3f}] y[{y:.3f},{y1:.3f}]".format(**o))
-    print("cikti:", cikti)
+        ek = ""
+        if "izgara_sayisi" in o:
+            ek += " izgara=%d" % o["izgara_sayisi"]
+        if "alt_ogeler" in o:
+            ek += " alt=%d" % len(o["alt_ogeler"])
+        if "civatalar" in o:
+            ek += " civata=%d" % len(o["civatalar"])
+        print("  {etiket:14s} x[{x:.3f},{x1:.3f}] y[{y:.3f},{y1:.3f}]".format(**o) + ek)
+    print("cikti:", cikti, "| zoom-grid:", zdir)
     return harita
 
 
@@ -408,9 +619,11 @@ if __name__ == "__main__":
     ap.add_argument("--boy", type=float, default=None)
     ap.add_argument("--koseler", type=str, default=None,
                     help='Manuel: "TLx,TLy TRx,TRy BRx,BRy BLx,BLy"')
+    ap.add_argument("--grid", type=float, default=0.01,
+                    help="grid minor araligi [0..1] (vars. 0.01; major=5x)")
     a = ap.parse_args()
     mk = None
     if a.koseler:
         mk = [[float(v) for v in p.split(",")] for p in a.koseler.split()]
         assert len(mk) == 4
-    analiz(a.gorsel, a.cikti, a.en, a.boy, mk)
+    analiz(a.gorsel, a.cikti, a.en, a.boy, mk, a.grid)
