@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+; Yerlestirilebilir tas sutun #2 (tek Tripo dosyasindan ayrilan 3 sutundan biri).
+; Tabani y=0'a gomulu (zemine oturur); konum/yon/olcek gizmo ile ayarlanir.
+
+[ext_resource type="PackedScene" uid="uid://cov08jmdom12u" path="res://models/sutun2.glb" id="1_s"]
+
+[node name="Sutun2" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_s")]
