@@ -50,13 +50,23 @@
 
 <footer>
   <div class="opts">
+    <label>Oran:
+      <select id="aspect" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 6px;color:var(--txt)">
+        <option value="9:16">Shorts 9:16 ↕</option>
+        <option value="1:1">Kare 1:1</option>
+        <option value="16:9">Yatay 16:9 ↔</option>
+        <option value="4:5">Dikey 4:5</option>
+        <option value="3:4">Dikey 3:4</option>
+        <option value="2:3">Dikey 2:3</option>
+      </select>
+    </label>
     <label><input type="checkbox" id="attachlast"> Son görseli referans ekle</label>
     <label><input type="checkbox" id="autosave" checked> Otomatik indir</label>
     <span class="sp" style="flex:1"></span>
     <span id="modellbl" style="color:var(--acc)"></span>
   </div>
   <div class="inbar">
-    <textarea id="prompt" placeholder="Ne üreteyim? (ör: backrooms için kirli ıslak fayans, dikişsiz, tepeden)"></textarea>
+    <textarea id="prompt" placeholder="Ne üreteyim? (Shorts kapağı/sahne/arka plan… dikey için Oran: 9:16 — ya da doku için: kirli fayans, dikişsiz)"></textarea>
     <button id="send">Gönder</button>
   </div>
 </footer>
@@ -128,8 +138,13 @@ function getProxy(){ return LS('proxy_url'); }
 function getProject(){ return LS('project'); }
 function getLocation(){ return LS('location','us-central1'); }
 function getSecret(){ return LS('secret'); }
-function refreshModelLbl(){ $('#modellbl').textContent = (getMode()==='vertex'?'Vertex · ':'API · ')+getModel(); }
+function getAspect(){ return LS('aspect','9:16'); }
+function refreshModelLbl(){ $('#modellbl').textContent = (getMode()==='vertex'?'Vertex · ':'API · ')+getModel()+' · '+getAspect(); }
 refreshModelLbl();
+
+// Oran (aspect) seçicisi — seçim hatırlanır
+$('#aspect').value = getAspect();
+$('#aspect').onchange = e=>{ localStorage.setItem('aspect', e.target.value); refreshModelLbl(); };
 
 function toggleMode(){
   const v = $('#mode').value==='vertex';
@@ -201,13 +216,24 @@ async function send(){
   if(!text){ return; }
 
   // TEK-TUR: bağlam biriktirmez -> payload şişmez, model her seferinde görsel üretir.
-  const parts=[{text}];
+  // Oranı hem prompt'a (her modelde çalışır) hem de resmi imageConfig alanına ekle.
+  const aspect=getAspect();
+  const HINT={
+    '9:16':'vertical 9:16 portrait orientation, full-frame, fills entire frame, 1080x1920',
+    '16:9':'horizontal 16:9 landscape orientation, full-frame, 1920x1080',
+    '4:5':'vertical 4:5 portrait orientation, full-frame',
+    '3:4':'vertical 3:4 portrait orientation, full-frame',
+    '2:3':'vertical 2:3 portrait orientation, full-frame',
+    '1:1':'square 1:1 composition' };
+  let reqText=text;
+  if(HINT[aspect]) reqText += `\n\n[image aspect ratio ${aspect} — ${HINT[aspect]}, no borders, no padding]`;
+  const parts=[{text:reqText}];
   if($('#attachlast').checked && lastImage){
     parts.push({ inline_data:{ mime_type:lastImage.mime, data:lastImage.b64 } });
     addSys('(son görsel referans olarak eklendi)');
   }
   const contents=[{ role:'user', parts }];
-  const genCfg={ responseModalities:["Text","Image"] };
+  const genCfg={ responseModalities:["Text","Image"], imageConfig:{ aspectRatio: aspect } };
 
   addUser(text);
   $('#prompt').value='';
@@ -261,6 +287,7 @@ const _ready = (getMode()==='vertex') ? (getProxy()&&getProject()) : !!getKey();
 if(!_ready){ addSys('Hoş geldin. ⚙️ Ayarlar: "Vertex proxy ($300 kredi)" seç + Proxy URL/Proje gir (proxy/KUR.md), ya da "API anahtarı" seç.'); }
 else { addSys('Hazır. Ne üreteyim? (ör: backrooms kirli ıslak fayans, dikişsiz, tepeden, 4K)'); }
 addSys('İpucu: bir doku beğenince "↺ Referans yap" → "bunun normal/roughness haritasını yap" diyerek devam et.');
+addSys('YouTube Shorts için: yukarıdan Oran = "Shorts 9:16 ↕" seç → dikey görsel üretilir (seçim hatırlanır).');
 </script>
 </body>
 </html>
