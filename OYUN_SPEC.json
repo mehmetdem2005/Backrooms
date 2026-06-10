@@ -1,0 +1,387 @@
+{
+ "meta": {
+  "proje": "Backrooms — 'Cikis Yok'",
+  "surum_spec": "2.0",
+  "tarih": "2026-06-10",
+  "motor": "Godot 4.6",
+  "hedef_platform": ["Android (APK, mobil)", "PC (masaustu)"],
+  "render": "Forward+ (PC) / Mobile (telefon) — ayni proje, export profiline gore",
+  "amac": "Atmosferik, optimize, akilli canavarli, hikayeli buyuk Backrooms kacis oyunu",
+  "tek_dogruluk_kaynagi": "tools/dunya_uretici/dunya_uret.py -> dunya_plan.json -> insa_dunya.gd -> Dunya.tscn"
+ },
+
+ "arastirma": {
+  "oyun_standartlari": {
+   "isik_optimizasyonu": [
+    "Gercek zamanli OmniLight sayisi mobilde 8-16 ile sinirli olmali; su an 62 isik = ana kasma sebebi.",
+    "Cozum 1 — BAKED LIGHTING: statik isiklari LightmapGI'ya bake et (calisma aninda bedava). Sadece feneri + birkac dinamik isigi gercek zamanli birak.",
+    "Cozum 2 — DISTANCE CULL: her OmniLight'a 'distance_fade' + makul 'omni_range'; uzaktaki isikler GPU'dan dusurulur.",
+    "Cozum 3 — golge kapali (shadow_enabled=false) zaten dogru; mobilde golge en pahali sey.",
+    "Cozum 4 — chunk yukleme ile gorunmeyen odalarin isiklari devre disi (process_mode).",
+    "Hedef: ekranda ayni anda <16 aktif gercek zamanli isik; gerisi bake/sahte (emissive)."
+   ],
+   "chunk_sistemi": [
+    "Dunya 4m hucre izgarasinda; odalari NxN 'chunk'lara grupla (or. 3x3 hucre).",
+    "Oyuncunun bulundugu + komsu chunklar AKTIF (gorunur+isik+fizik), digerleri PASIF (gizli, isik kapali).",
+    "Godot'ta: her chunk bir Node3D; visible + her isigin enabled'i oyuncu mesafesine gore guncellenir (frame basina degil, oyuncu hucre degistirince).",
+    "Okluzyon: Godot OccluderInstance3D ile duvar arkasi odalar GPU'dan dusurulur.",
+    "Hedef: 10x buyuk haritada sabit FPS — sadece ~9 chunk aktif."
+   ],
+   "ses_sistemi": [
+    "AudioStreamPlayer3D ile 3B konumlu ses (canavar sesi mesafeye/yone gore).",
+    "Audio bus'lar: Master > Muzik, SFX, Ambiyans, Canavar; her birine reverb/lowpass.",
+    "Bolgeye gore ambiyans (AreaTrigger ile gecis): lobi sessiz ugultu, bakim jenerator vinilti, islak su damlasi, yaratik ini kalp atisi.",
+    "Dinamik gerilim: canavar yakinligina gore muzik/kalp atisi yukselir (RMS/ducking).",
+    "Ayak sesi: zemin tipine + hareket moduna gore (sessiz/normal/kosu) farkli ses + ses YARICAP'i (canavar duyar).",
+    "Footstep occlusion + reverb zone'lar AudioServer ile."
+   ],
+   "canavar_animasyon": [
+    "AnimationTree (StateMachine) : idle, walk, run, lunge(saldiri), scream, eat.",
+    "Hiz parametresine gore walk<->run blend; kovalarken run, kesisme/pusuda walk.",
+    "Root motion yerine kod-suruslu hareket + animasyon hizi senkron (ayak kaymasi olmasin).",
+    "IK opsiyonel (basit): bas oyuncuya doner (LookAt) -> tedirgin edici."
+   ],
+   "duvar_zemin_moduler": [
+    "AAA modulerlik: tek buyuk duvar yerine 0.5 scale parcalar + 2 kat ust uste -> doku tekrari kirilir, detay artar.",
+    "Trim/varyasyon: ayni duvardan birden cok doku varyanti (irili duvar2 + kirli) rastgele degil DESENLI dagit.",
+    "Kapi pervazi (jamb): kapi acikligi kenarindaki dolgu duvarlar kapinin kanat genisligine/yuksekligine TAM oturmali; ust lento kapi ustunu kapatmali (mevcut hata: pervaz olcusu kapiya uymuyor)."
+   ],
+   "fener": [
+    "SpotLight3D + cooldown'suz acma/kapama; pil sistemi (sarj 0-100, zamanla azalir).",
+    "Havali his: hafif titreme (flicker noise), sicak->soguk renk pil azalinca, lens flare/volumetrik koni (mobilde hafif).",
+    "Pil bitince sonme + el feneri sallama ile gecici parlama (klasik korku mekanigi).",
+    "Pil toplama: dunyada DESENLI yerlestirilmis pil pickup'lari."
+   ],
+   "isik_varyasyonu": [
+    "SAHTE LAMBA: bazi tavan lambalari mesh+emissive ama OmniLight YOK; yanindaki gercek bir isigi paylasir -> isik sayisi duser, gorsel ayni.",
+    "TITREYEN/ACILIP-KAPANAN: bazi isiklar timer+noise ile flicker; bozuk floresan hissi (korku standardi).",
+    "ISIK SIZMASI FIX: omni_range'leri oda boyutuna sigacak sekilde kis; duvar arkasina tasmayi engelle (su an arada duvar olsa bile isik geciyor)."
+   ],
+   "harita_tasarimi": [
+    "10x buyuk ama 'geometrik olmayan': duzenli izgara hissi YOK; asimetrik oda boyutlari, cikmaz koridorlar, donen yollar, kot farki hissi veren bolgeler.",
+    "Backrooms estetigi: tekrar+kaybolmuslik hissi ama navigasyon ipuclari (isik rengi/landmark ile yon bulma).",
+    "Akis korunur: guvenli->tedirgin->tehlike->cikis; ama coklu yol, kestirmeler, canavarin kesisme rotalari.",
+    "DESENLI kirlilik/leke: rastgele degil, su sizinti noktalari/kose/trafik yonune gore mantikli."
+   ],
+   "oyuncu_hareket": [
+    "Standart modern FPS: yurume, KOSU (sprint, stamina tuketir), EGILME (crouch, sessiz+yavas), SESSIZ yurume (yavas, dusuk ses yaricapi).",
+    "Stamina: kosunca azalir, durunca yenilenir; bitince kosamaz (nefes sesi).",
+    "Hareket modu -> ayak sesi yaricapi -> canavarin seni duyma mesafesi (ses-tabanli AI baglantisi)."
+   ]
+  },
+
+  "yapay_zeka_arastirma": {
+   "navigasyon": [
+    "Godot NavigationServer3D + NavigationRegion3D: NavigationMesh haritadan bake edilir; canavar NavigationAgent3D ile engellerin ETRAFINDAN dolanir (duvarlara takilmaz).",
+    "Dinamik engeller icin NavigationObstacle3D.",
+    "Yol yeniden hesaplama: oyuncu pozisyonu degisince path guncelle (her frame degil, ~0.3s araliklarla -> performans)."
+   ],
+   "davranis_mimarisi": [
+    "Utility AI veya Hierarchical State Machine (HSM). Onerilen: HSM + utility skorlama.",
+    "Durumlar: DEVRIYE(patrol), ARASTIRMA(investigate-ses duydu), KOVALAMA(chase), KESISME(intercept/flank), PUSU(ambush), KAYIP(lost-son gorulen yere git), GERI_CEKIL(reset).",
+    "Referans: F.E.A.R. (GOAP planli AI), Alien: Isolation (iki katmanli 'director' + yaratik AI; director oyuncuyu izler ipucu verir, yaratik kendi arar -> hile hissi vermeden gerilim)."
+   ],
+   "kesisme_flanking": [
+    "Canavar bazen kovalamayi birakip oyuncunun GIDECEGI yeri tahmin edip baska yoldan onunu keser.",
+    "Nasil: oyuncu hareket yonu + hedef tahmini -> NavigationServer ile oyuncunun muhtemel varis dugumune ALTERNATIF en kisa yolu hesapla -> o yola gir.",
+    "DENGE (fairness): intercept sadece belli kosullarda (oyuncu uzun suredir gorunuyor + canavar avantajli) ve COOLDOWN'lu; surekli onunu kesmez. Oyuncuya kacis penceresi birak."
+   ],
+   "algi_perception": [
+    "Gorus: ConeFOV + raycast (duvar arkasini gormez). Gorunce 'awareness' artar.",
+    "Isitme: oyuncu ayak sesi yaricapi (kosu>normal>sessiz>egilme); ses gelirse ARASTIRMA durumu.",
+    "Bellek: son gorulen konum + zaman; oyuncu kaybolunca oraya gidip arar, sonra devriyeye doner."
+   ],
+   "tedirginlik_horror": [
+    "Ongorulemezlik: sabit devriye degil, utility ile degisken; bazen durur, dinler, bas cevirir.",
+    "Stalking: oyuncuyu hemen oldurmek yerine takip/gozlem (Alien tarzi) -> psikolojik baski.",
+    "Ses ipuclari: gorunmeden once uzaktan ses; yaklasinca muzik/kalp atisi.",
+    "Dinamik zorluk: cok yakalandiysan AI bir sure 'merhametli' (director ducking) -> adil gerilim."
+   ]
+  }
+ },
+
+ "gereksinimler": [
+  {
+   "id": 1, "baslik": "Isik optimizasyonu (kasma cozumu)", "oncelik": "kritik", "durum": "yapilacak",
+   "kaynak_promt": "bu kadar fazla isik oyunun kasasina sebep oluyor isik optimasyonu yapman gerekiyor",
+   "yaklasim": "62 gercek zamanli OmniLight -> LightmapGI bake + distance_fade + chunk ile devre disi; ekranda <16 aktif isik.",
+   "gorevler": [
+    "Statik isiklari bake'e uygun isaretle (light_bake_mode=STATIC).",
+    "Her OmniLight'a distance_fade_begin/length ekle.",
+    "omni_range'leri oda boyutuna gore daralt.",
+    "Chunk pasifken o chunk'in isiklarini kapat."
+   ],
+   "kabul_kriteri": "Mobil profilde 10x haritada >=30 FPS; ekranda aktif gercek zamanli isik <=16.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "tools/dunya_uretici/insa_dunya.gd", "Dunya.tscn"]
+  },
+  {
+   "id": 2, "baslik": "Chunk (parca) yukleme sistemi", "oncelik": "kritik", "durum": "yapilacak",
+   "kaynak_promt": "chunk sistemi kurman gerekiyor",
+   "yaklasim": "Odalari 3x3 hucre chunklara grupla; oyuncu hucresine gore aktif/pasif (gorunur+isik+fizik).",
+   "gorevler": [
+    "Plan uretiminde her instance'a chunk_id ata (i//3, j//3).",
+    "insa: her chunk ayri Node3D; ChunkYonetici.gd oyuncu hucresini izler.",
+    "Komsu 3x3 chunk aktif, gerisi visible=false + isik kapali.",
+    "OccluderInstance3D ile duvar arkasi okluzyon."
+   ],
+   "kabul_kriteri": "Ayni anda en fazla ~9 chunk aktif; uzak chunklar GPU/fizikten dusuk.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "addons/chunk/ChunkYonetici.gd (yeni)", "Dunya.tscn"]
+  },
+  {
+   "id": 3, "baslik": "Gelismis ses sistemi", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "gelismis ses sistemi kurman gerekiyor",
+   "yaklasim": "3B konumlu ses + audio bus mimarisi + bolge ambiyansi + dinamik gerilim muzigi + zemin/mod bazli ayak sesi.",
+   "gorevler": [
+    "Audio bus: Master>Muzik,SFX,Ambiyans,Canavar (reverb/lowpass).",
+    "AudioStreamPlayer3D: canavar sesleri, jenerator, su damlasi, floresan vinilti.",
+    "AreaTrigger ile bolge ambiyans gecisi.",
+    "Canavar yakinligina gore gerilim katmani (kalp atisi/muzik) yukselt.",
+    "Ayak sesi: zemin tipi + hareket modu -> ses + duyulma yaricapi."
+   ],
+   "kabul_kriteri": "Bolge degisince ambiyans degisir; canavar yaklasinca ses artar; ayak sesi moda gore degisir.",
+   "dosyalar": ["addons/ses/SesYonetici.gd (yeni)", "audio/ (yeni ses dosyalari)", "oyuncu.gd", "parts/canavar.gd"]
+  },
+  {
+   "id": 4, "baslik": "Gelismis canavar kovalama animasyonu", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "gelismis canavar kovalama animasyonu kurman gerekiyor",
+   "yaklasim": "AnimationTree StateMachine: idle/walk/run/lunge/scream; hiza gore blend, koda senkron.",
+   "gorevler": [
+    "canavar.glb animasyonlarini AnimationTree'ye bagla.",
+    "Hiz parametresi -> walk/run blend.",
+    "Kovalarken run + bas oyuncuya doner (LookAt).",
+    "Saldiri menzilinde lunge animasyonu."
+   ],
+   "kabul_kriteri": "Canavar yururken/kosarken ayak kaymaz; durum gecisleri yumusak.",
+   "dosyalar": ["parts/Canavar.tscn", "parts/canavar.gd"]
+  },
+  {
+   "id": 5, "baslik": "Moduler duvar/zemin (0.5 scale, 2 kat ust uste)", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "duvarlari tek kullanma, duvar buyuklugunu 0.5 scale yap ve 2 duvar ust uste koy zemini de ayni sekilde",
+   "yaklasim": "Tek 4x3 duvar yerine 0.5 scale parcalardan 2 kat (alt+ust) dosenmis duvar; zemin de 0.5 karelerle 2 katman/grid.",
+   "gorevler": [
+    "Duvar uretimini parcali yap: yatayda 0.5 genislik dilimleri, dikeyde 2 sira (alt/ust).",
+    "Zemini 0.5 karelere bol (2x2 -> daha kucuk fayans gridi), doku tekrari kirilir.",
+    "Varyantlari (Duvar/Duvar2/irili) desenli dagit."
+   ],
+   "kabul_kriteri": "Duvarlar tek dev parca degil; gorsel detay/tekrar kirilmasi artar; carpisma butun kalir.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "tools/dunya_uretici/insa_dunya.gd"]
+  },
+  {
+   "id": 6, "baslik": "Kapi pervaz/kenar duvarlari kapiya uysun", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "kapilarin kenarlarindaki duvarlar kapinin sekline uymuyor onu duzelt",
+   "yaklasim": "Kapi kanat genisligi/yuksekligi ile yan dolgu (jamb) ve ust lento olculerini birebir eslestir; bosluk/tasma olmasin.",
+   "gorevler": [
+    "DOOR_W ve gercek kapi mesh AABB'sini olc, FILL_W ve lento olcusunu ona gore yeniden hesapla.",
+    "Yan dolgu yuksekligi kapi yuksekligine, lento kapi ustu boslugu tam kapatacak sekilde.",
+    "Render+oyun icinde dogrula (bosluk/cakisma yok)."
+   ],
+   "kabul_kriteri": "Kapi cercevesi etrafinda bosluk veya tasan duvar yok; lento kapi ustunu tam kapatir.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 7, "baslik": "Mobil kontroller", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "mobil kontroller",
+   "yaklasim": "Dokunmatik: sol analog (hareket), sag ekran (bakis), butonlar (kosu/egilme/fener/etkilesim). CanvasLayer UI.",
+   "gorevler": [
+    "Sol joystick (TouchScreenButton/ozel) hareket.",
+    "Sag yari ekran sürükleme -> bakis.",
+    "Butonlar: kosu, egilme, fener ac/kapa, etkilesim (kapi/pil).",
+    "PC'de gizli, mobilde gorunur (OS.has_feature)."
+   ],
+   "kabul_kriteri": "Telefonda parmakla gezilebilir, bakilabilir, kosu/egilme/fener calisir.",
+   "dosyalar": ["arayuz/MobilKontrol.tscn (yeni)", "oyuncu.gd", "project.godot (input)"]
+  },
+  {
+   "id": 8, "baslik": "Havali fener + pil sistemi", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "elimizde havali bir fener yok ... fener pilleri olmali bazi yerlerde",
+   "yaklasim": "SpotLight3D fener: titreme, pil azalinca renk/parlaklik dusus, sonme; pil pickup'lari desenli yerlestirme.",
+   "gorevler": [
+    "Fener SpotLight3D + el modeli/koni; ac/kapa.",
+    "Pil 0-100, zamanla azalir; bitince soner, sallayinca gecici parlar.",
+    "Pil pickup parcasi + dunyada desenli yerlestirme + toplama (etkilesim).",
+    "Havali: hafif flicker, sicak->soguk renk, koni volumetrik (mobil hafif)."
+   ],
+   "kabul_kriteri": "Fener acilir/kapanir, pil azalir, pil toplanir; gorsel olarak 'havali'.",
+   "dosyalar": ["oyuncu.gd", "parts/Pil.tscn (yeni)", "tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 9, "baslik": "Sahte lambalar (isik paylasimi)", "oncelik": "orta", "durum": "yapilacak",
+   "kaynak_promt": "bazi lambalar sahte olmali baska isigin lambasiyla beraber kullanilmali",
+   "yaklasim": "Bazi tavan lambasi mesh+emissive ama OmniLight yok; yanindaki gercek isigi gorsel olarak paylasir -> isik sayisi duser.",
+   "gorevler": [
+    "Plan uretiminde lamba mesh'i her hucrede ama OmniLight sadece belli hucrelerde (or. 2 hucrede 1).",
+    "Sahte lamba emissive ile yanik gorunur."
+   ],
+   "kabul_kriteri": "Lamba sayisi ayni gorunur ama gercek isik sayisi ~yariya iner.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 10, "baslik": "Acilip kapanan/titreyen isiklar", "oncelik": "orta", "durum": "yapilacak",
+   "kaynak_promt": "bazi isiklar acilip kapanir olmali",
+   "yaklasim": "Bazi isiklara flicker/timer scripti: bozuk floresan; rastgele aralikla soner-yanar.",
+   "gorevler": [
+    "Plan'da isik 'flicker:true' bayragi.",
+    "insa: flicker isiklara TitreyenIsik.gd ekle (noise/timer ile energy modulasyonu)."
+   ],
+   "kabul_kriteri": "Belli isiklar bozuk floresan gibi titrer/soner; korku atmosferi.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "addons/isik/TitreyenIsik.gd (yeni)"]
+  },
+  {
+   "id": 11, "baslik": "Isik sizmasi (duvar arkasina tasma) duzeltme", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "bazi isiklar diger odalara tasiyor arada duvar olmasina ragmen",
+   "yaklasim": "omni_range'i oda yari-genisligine sigacak sekilde kis; bake sonrasi sizinti yok; gerekirse isigi oda merkezine hizala.",
+   "gorevler": [
+    "Her isigin range'ini bulundugu oda olcusune gore sinirla.",
+    "Golgesiz omni duvar gecirir -> range kisitlama + bake ile coz.",
+    "Dogrula: kapali odada yan oda isigi gorunmuyor."
+   ],
+   "kabul_kriteri": "Arada duvar olan odaya isik tasmaz.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "insa_dunya.gd"]
+  },
+  {
+   "id": 12, "baslik": "Daha cok kir/leke + irili duvar ve fayans", "oncelik": "orta", "durum": "yapilacak",
+   "kaynak_promt": "daha cok kirle boya ve zaten irili olan duvar ve fayanslari kullan",
+   "yaklasim": "Leke sayisini artir + DESENLI dagit (kose/sizinti/trafik); irili (yuksek detayli/buyuk desenli) duvar2 ve fayans varyantlarini agirlikli kullan.",
+   "gorevler": [
+    "stain sayisini artir, mantikli konumlandir (rastgele degil).",
+    "Duvar/zemin doku varyant secimini 'irili' olanlara kaydir.",
+    "Duvar diplerine/koselere ekstra kir."
+   ],
+   "kabul_kriteri": "Yuzeyler belirgin kirli/yipranmis; irili dokular baskin.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 13, "baslik": "Haritayi 10 kata cikar (havali, geometrik olmayan)", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "haritayi 10 katina kadar cikart ama gene dusunerek havali geometrik olmayan bir harita yap",
+   "yaklasim": "Alan ~10x; izgara hissi YOK: asimetrik odalar, cikmazlar, donen koridorlar, landmark'lar; akis+coklu yol+kesisme rotalari korunur.",
+   "gorevler": [
+    "GRID'i buyut (or. ~30x30+), elle DUSUNULMUS bolgeler ciz (prosedurel degil, tasarlanmis).",
+    "Asimetri: farkli boy odalar, cikmaz koridorlar, kestirmeler.",
+    "Bolgesel atmosfer + landmark ile yon bulma.",
+    "Canavar kesisme rotalari icin coklu baglanti."
+   ],
+   "kabul_kriteri": "Alan ~10x; harita duzenli kafes gibi degil, kesfedilesi/kaybolunasi ama gecilebilir.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 14, "baslik": "Akilli canavar AI (engel etrafindan dolanma)", "oncelik": "kritik", "durum": "yapilacak",
+   "kaynak_promt": "daha akilli ve engellerin etrafindan dolanan bir canavar yapay zekasi",
+   "yaklasim": "NavigationServer3D + NavigationAgent3D ile gercek yol bulma; duvarlara takilmaz, engelden dolanir.",
+   "gorevler": [
+    "Haritadan NavigationMesh bake (NavigationRegion3D).",
+    "Canavara NavigationAgent3D; hedefe path ile git.",
+    "Path ~0.3s'de bir guncellenir (perf)."
+   ],
+   "kabul_kriteri": "Canavar duvar/engel etrafindan akici sekilde dolanir, takilmaz.",
+   "dosyalar": ["parts/canavar.gd", "Dunya.tscn (NavigationRegion3D)", "insa_dunya.gd"]
+  },
+  {
+   "id": 15, "baslik": "Daha tedirgin edici canavar", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "daha tedirgin edici bir canavar yap",
+   "yaklasim": "Stalking (hemen oldurmez, izler), ongorulemez davranis, ses ipuclari, ani yon degistirme, oyuncuya bakma.",
+   "gorevler": [
+    "Stalk durumu: belli mesafede takip, ara ara durup dinleme.",
+    "Gorunmeden once uzaktan ses; yaklasinca gerilim sesi (id3 ile).",
+    "Ani bas cevirme/durma (utility)."
+   ],
+   "kabul_kriteri": "Canavar tahmin edilemez ve psikolojik baski yaratir.",
+   "dosyalar": ["parts/canavar.gd", "addons/ses/SesYonetici.gd"]
+  },
+  {
+   "id": 16, "baslik": "Kesisme/onunu kesme AI (dengeli flanking)", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "bazen bizi kovalamayi birakip baska yoldan onumuzu kesmeye calissin ama dengesi olsun",
+   "yaklasim": "Oyuncunun gidecegi dugumu tahmin et, alternatif yoldan kesme; cooldown+kosul ile adil (surekli degil).",
+   "gorevler": [
+    "Oyuncu yon/hedef tahmini -> NavigationServer ile intercept yolu.",
+    "KESISME durumu: kovalamayi birak, kestirmeden one gec.",
+    "Fairness: sadece (uzun gorus + avantaj) + cooldown; oyuncuya kacis penceresi."
+   ],
+   "kabul_kriteri": "Canavar bazen onunu keser ama bunaltmaz; oyuncunun kacma sansi kalir.",
+   "dosyalar": ["parts/canavar.gd"]
+  },
+  {
+   "id": 17, "baslik": "Oyuncu hareket: sessiz/egilme/kosu + stamina", "oncelik": "yuksek", "durum": "yapilacak",
+   "kaynak_promt": "nasil sessiz yurume egilme hizli yurume stamina var vs de olmali",
+   "yaklasim": "Hareket modlari: normal/sprint(stamina)/crouch(sessiz+yavas)/sessiz; her mod ses yaricapi -> AI duyma.",
+   "gorevler": [
+    "Sprint: stamina tuketir, durunca yenilenir, bitince kosamaz (nefes sesi).",
+    "Crouch: yukseklik+hiz dusurur, ses yaricapi minimum.",
+    "Sessiz yurume: yavas, dusuk ses.",
+    "Mod -> ayak sesi yaricapi -> canavar perception baglantisi."
+   ],
+   "kabul_kriteri": "4 hareket modu calisir; stamina bar; egilince/sessizken canavar gec duyar.",
+   "dosyalar": ["oyuncu.gd", "arayuz/HUD.tscn (stamina/pil)", "project.godot (input)"]
+  },
+  {
+   "id": 18, "baslik": "Assetleri rastgele degil DESENLI dagit", "oncelik": "orta", "durum": "yapilacak",
+   "kaynak_promt": "assestleru rastgele dagitma",
+   "yaklasim": "Tum obje/leke/pil/isik yerlesimi TASARLANMIS (elle/kurallı) olsun; random.choice ile sacma yok.",
+   "gorevler": [
+    "Leke dagitimini kuralli yap (sizinti/kose/trafik).",
+    "Obje/pil yerlesimini bolge mantigina gore elle/desenli.",
+    "Rastgele seed'e bagimliligi kaldir veya kontrollu desene cevir."
+   ],
+   "kabul_kriteri": "Yerlesim dusunulmus gorunur; rastgele sacilmis his yok.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 19, "baslik": "Gelismis oyun standartlari arastirmasi", "oncelik": "bilgi", "durum": "tamamlandi",
+   "kaynak_promt": "gelismis oyun standartlarinda arastir",
+   "yaklasim": "Bu spec'in 'arastirma.oyun_standartlari' bolumune islendi (isik bake/cull, chunk/okluzyon, audio bus/3B ses, animasyon tree, modulerlik).",
+   "kabul_kriteri": "Her sistem icin uygulanabilir standart yontem belgelendi.",
+   "dosyalar": ["OYUN_SPEC.json (arastirma)"]
+  },
+  {
+   "id": 20, "baslik": "Gelismis yapay zeka arastirmasi", "oncelik": "bilgi", "durum": "tamamlandi",
+   "kaynak_promt": "gelismis yapay zeka nasil yapilir onuda arastir",
+   "yaklasim": "'arastirma.yapay_zeka_arastirma' bolumune islendi (NavMesh, HSM/utility, perception, flanking, F.E.A.R./Alien Isolation referanslari).",
+   "kabul_kriteri": "Uygulanabilir AI mimarisi + referanslar belgelendi.",
+   "dosyalar": ["OYUN_SPEC.json (arastirma)"]
+  },
+  {
+   "id": 21, "baslik": "Bu promtu JSON'a tek tek dok (atlanmadan)", "oncelik": "kritik", "durum": "tamamlandi",
+   "kaynak_promt": "bu tum promtumu JSON formatinda tek tek hazirla hicbirseyi atlamadigindsn emin ol",
+   "yaklasim": "Bu dosya (OYUN_SPEC.json) — 23 maddenin tamami 'gereksinimler' dizisinde, her birinde kaynak_promt alintisi.",
+   "kabul_kriteri": "Promttaki her istek bir gereksinim id'sine eslesir.",
+   "dosyalar": ["OYUN_SPEC.json"]
+  },
+  {
+   "id": 22, "baslik": "APK uret ve teslim et", "oncelik": "kritik", "durum": "yapilacak (en son)",
+   "kaynak_promt": "en son apk yap bana ver",
+   "yaklasim": "Tum sistemler uygulandiktan sonra Godot Android export ile imzali APK; indirme linki.",
+   "gorevler": [
+    "Android export template + SDK + keystore kurulumu (ortamda mevcutsa).",
+    "export_presets.cfg (Android, mobil render, etui dokunmatik).",
+    "godot --headless --export-release Android out/Backrooms.apk.",
+    "APK'yi indirme linkiyle teslim."
+   ],
+   "kabul_kriteri": "Telefona kurulup acilan, oynanabilir imzali APK + indirme linki.",
+   "dosyalar": ["export_presets.cfg (yeni)", "dist/Backrooms.apk (cikti)"]
+  },
+  {
+   "id": 23, "baslik": "Hikaye/akis korunsun (mevcut 'Cikis Yok')", "oncelik": "orta", "durum": "devam",
+   "kaynak_promt": "(onceki) hikayeli ve dusunulmus harita — 10x buyutmede korunmali",
+   "yaklasim": "Resepsiyon->koridor->kesif->bakim->islak->yaratik ini->cikis akisi 10x haritada bolgesel atmosferle korunur.",
+   "kabul_kriteri": "Buyuk haritada baslangic->cikis anlatisi ve atmosfer gecisi anlasilir.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  }
+ ],
+
+ "yol_haritasi": {
+  "aciklama": "Bagimlilik sirasi: once dunya/generator (deterministik, dogrulanabilir), sonra runtime sistemler, en son APK.",
+  "fazlar": [
+   {"faz": 1, "ad": "Dunya temel (generator)", "kapsam": [5,6,9,11,12,18,13], "cikti": "10x, moduler duvar/zemin, kapi fix, sahte/sizmasiz isik, desenli kir, buyuk harita; kroki+render ile dogrulanir."},
+   {"faz": 2, "ad": "Performans", "kapsam": [1,2], "cikti": "Isik bake/cull + chunk yukleme; mobilde sabit FPS."},
+   {"faz": 3, "ad": "Oyuncu sistemleri", "kapsam": [17,8,7], "cikti": "Hareket modlari+stamina, fener+pil, mobil kontrol+HUD."},
+   {"faz": 4, "ad": "Canavar AI + ses + animasyon", "kapsam": [14,15,16,4,3,10], "cikti": "NavMesh AI, flanking, stalking, anim tree, ses sistemi, titreyen isik."},
+   {"faz": 5, "ad": "APK", "kapsam": [22], "cikti": "Imzali Android APK + indirme linki."}
+  ]
+ },
+
+ "riskler_ve_notlar": [
+  "APK icin Godot Android export template + SDK gerekir; bu uzak ortamda kurulu olmayabilir — faz 5'te kontrol edilip, yoksa alternatif (build talimati + GitHub Actions APK) sunulacak.",
+  "LightmapGI bake suresi buyuk haritada uzun olabilir; gerekirse sadece kritik bolgeler bake, gerisi cull.",
+  "Tum kapsam tek seferde degil, faz faz uygulanip her faz commit+dogrulama (kroki/render/headless yukleme testi) ile ilerleyecek.",
+  "canavar.glb 49 materyal/64k ucgen: mobilde agir; AI eklenirken doku atlas/LOD opsiyonu degerlendirilecek."
+ ]
+}
