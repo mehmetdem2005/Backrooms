@@ -364,6 +364,21 @@
    "yaklasim": "Resepsiyon->koridor->kesif->bakim->islak->yaratik ini->cikis akisi 10x haritada bolgesel atmosferle korunur.",
    "kabul_kriteri": "Buyuk haritada baslangic->cikis anlatisi ve atmosfer gecisi anlasilir.",
    "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 24, "baslik": "Acilis sinematigi (canavar bizi serbest birakir, 10'a sayar)", "oncelik": "yuksek", "durum": "yapilacak (Faz 4)",
+   "kaynak_promt": "en basta biz bayginken goz acilip kapanma efekti ekle uyanir gibi, canavar basimizda bekliyor korkmamiz ona zevk verdigi icin bizi uyanik avlamak istiyor, uyaniyoruz canavar bizi tutmus korkunc bir ses tonuyla bagirarak serbest birakiyor kacmamizi soyleyecek iyi bir replik korkunc sesle uyumlu, 10 saniye sayacagini soyluyor birakiyor 10'a kadar sayiyor rahatsiz edici ses tonu, sinematik animasyonla baslayacagiz, canavara da animasyon yap bunlari soylerken uygun olsun",
+   "yaklasim": "Oyun acilisinda kontrol kapali sinematik: (1) siyah ekran + goz acilip kapanma (kirpma) efekti -> oyuncu ayiliyor; (2) kamera yukari kalkar, canavar yuzune cok yakin, oyuncuyu tutuyor; (3) canavar korkunc/rahatsiz edici seste bagirir ve replik soyler (kac!); (4) '10'a kadar sayacagim' der, oyuncuyu birakir (kamera yere/geri dusus), (5) canavar geri cekilirken rahatsiz edici tonda 10'dan geri/ileri sayar; sayim bitince/oyuncu kacmaya baslayinca AV (chase) baslar. Canavarin agzi/kollari konusurken uygun animasyonla (scream/talk/grab/release) oynar.",
+   "alt_sistemler": {
+    "kirpma_efekti": "CanvasLayer + ColorRect siyah; goz kapagi: ust+alt iki ColorRect acilip kapanir (Tween), bulanik->net gecis (blur azaltma), nefes/kalp sesi.",
+    "kamera_sinematik": "AnimationPlayer ile kamera yolu (yerde bayginlik POV -> kalkis -> canavar yuzu -> birakilis). Oyuncu input kilitli.",
+    "canavar_animasyon": "AnimationTree state: grab(tutma) -> scream(bagirma) -> talk(replik) -> release(birakma) -> retreat(geri cekilme/sayim). canavar.glb animasyon klipleri kullanilir; yoksa prosedurel (bone/scale/lunge) hareket.",
+    "ses": "Korkunc/rahatsiz edici ses tonu (pitch-down + distortion + reverb). Replik + 10 sayim sesli (TTS veya yer tutucu klip). Disturbing: hafif detune, whisper-layer.",
+    "replik_ornegi": "Bagiris: 'UYAN!... Uyudugun her an benim eglencemdi. Ama korkun... uyanikken cok daha tatli.' / Birakirken: 'Kac. ON saniye veriyorum. Bir... iki... uc...' (geri/ileri sayim, her sayida yaklasma hissi).",
+    "akis_kontrol": "Sinematik bitince GameState 'CHASE'e gecer; sayim suresi (10s) oyuncuya bas avantaji; sayim biterken canavar AV moduna (id14-16)."
+   },
+   "kabul_kriteri": "Oyun acilista kontrol kapali sinematikle baslar: kirpma->uyanma->canavar yuzde->bagiris+replik->birakma->10 sayim->av baslar; canavar animasyonlu, ses rahatsiz edici.",
+   "dosyalar": ["sahneler/AcilisSinematik.tscn (yeni)", "sahneler/sinematik.gd (yeni)", "parts/Canavar.tscn", "parts/canavar.gd", "addons/ses/SesYonetici.gd", "Dunya.tscn (oyun durumu)"]
   }
  ],
 
