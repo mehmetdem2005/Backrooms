@@ -47,83 +47,125 @@ FLOOR_TEX = {".":"Zemin", "g":"GriZemin", "f":"FayansZemin"}
 
 # -------------------------------------------------- KAT PLANI (oda-id izgarasi)
 # Her hucre bir oda id'si (bitisik ayni id = tek oda, ic duvar yok). '.' = bosluk.
-# HIKAYE: "CIKIS YOK" - oyuncu terk edilmis tesise no-clip yapmistir; resepsiyonda
-# uyanir, cikisi arar. Ilerledikce mekan insanliktan uzaklasir; atmosfer isikla anlatilir:
-# parlak lobi -> los koridor -> karanlik arsiv -> soguk-yesil bakim -> islak sizinti ->
-# kirmizi yaratik ini -> yesil CIKIS. Cikisa ulasmak icin yaratigin bolgesinden gecmek gerekir.
-GRID = [
-    list(".RRRR.OOOO"),   # i0  Resepsiyon/Lobi(R) ......... Acik Ofis(O)
-    list(".RRRR.OOOO"),   # i1
-    list(".RRRR.OOOO"),   # i2
-    list("..R....O.."),   # i3  lobi->koridor gecidi (j2) / ofis->koridor gecidi (j7)
-    list("KKKKKKKKKK"),   # i4  ANA KORIDOR (omurga, los)
-    list("AA.VV.TT.."),   # i5  Arsiv(A) | Bakim-Jenerator(V) | Toplanti(T)
-    list("AA.VV.TT.."),   # i6
-    list("AA.WW....."),   # i7  Arsiv devam | Islak Koridor(W) bakimdan asagi iner
-    list("...WNNNN.."),   # i8  Islak -> Yaratigin Ini(N)
-    list(".....NNNNE"),   # i9  Yaratigin Ini + CIKIS(E) en uzak kosede
-]
-NR, NC = len(GRID), len(GRID[0])
+# HIKAYE: "CIKIS YOK" - 10x buyutulmus, TASARLANMIS (geometrik olmayan) terk tesis.
+# Bolgeler dikdortgenlerle elle tasarlandi (prosedurel-rastgele DEGIL); kivrimli koridor
+# omurgasi + dallar + cikmazlar + canavar icin COKLU rota (W ve P ikisi de KD'ye baglanir).
+# Akis: Resepsiyon -> kivrimli koridor -> ofis/arsiv/bakim/kazan/toplanti dallari ->
+# islak koridor + otopark -> en alt koridor -> Yaratigin Ini -> CIKIS (en uzak kose).
+H, W = 40, 38   # canvas: satir(H), sutun(W)
 
-# Bolge atmosfer isik profilleri: (renk[r,g,b], enerji, menzil)
+# Bolge atmosfer isik profilleri: (renk[r,g,b], enerji, menzil)  -- menzil oda-ici tutulur (sizma az)
 ISIK = {
-    "lobi":    ([1.00,0.96,0.88], 3.6, 8.0),   # parlak, davetkar (guvenli his)
-    "ofis":    ([1.00,0.90,0.60], 2.5, 7.0),   # eski sari floresan, terk
-    "koridor": ([0.84,0.86,0.94], 1.7, 6.5),   # los, klostrofobik
-    "arsiv":   ([0.92,0.74,0.50], 1.2, 5.5),   # tozlu, olu sicaklik
-    "bakim":   ([0.55,0.95,0.68], 2.2, 7.0),   # soguk yesil sanayi (jenerator)
-    "toplanti":([0.86,0.86,0.82], 1.9, 6.5),
-    "islak":   ([0.48,0.60,0.80], 1.0, 5.0),   # karanlik mavi, sizinti
-    "yaratik": ([0.95,0.32,0.28], 1.3, 6.0),   # kirmizi, tehlike
-    "cikis":   ([0.55,1.00,0.70], 3.9, 8.5),   # parlak yesil, umut (EXIT)
+    "lobi":    ([1.00,0.96,0.88], 3.4, 7.0),
+    "ofis":    ([1.00,0.90,0.60], 2.4, 6.2),
+    "koridor": ([0.84,0.86,0.94], 1.7, 6.0),
+    "arsiv":   ([0.92,0.74,0.50], 1.2, 5.0),
+    "bakim":   ([0.55,0.95,0.68], 2.1, 6.2),
+    "kazan":   ([1.00,0.55,0.28], 1.8, 5.8),   # turuncu kazan/firin
+    "toplanti":([0.86,0.86,0.82], 1.8, 6.0),
+    "islak":   ([0.48,0.60,0.80], 1.0, 4.8),   # karanlik mavi, sizinti
+    "otopark": ([0.70,0.74,0.80], 1.5, 7.0),   # genis los
+    "yaratik": ([0.95,0.32,0.28], 1.2, 5.5),   # kirmizi, tehlike
+    "cikis":   ([0.55,1.00,0.70], 3.8, 8.0),   # parlak yesil, umut
 }
 
-ODA = {  # id -> (ad, zemin, kroki rengi, isik profili)
-    "R":("Resepsiyon","g","#d7dbe0","lobi"),
-    "O":("Acik Ofis","f","#e7ded0","ofis"),
-    "K":("Ana Koridor",".","#cdd2bc","koridor"),
-    "A":("Arsiv","f","#d8cdb6","arsiv"),
-    "V":("Bakim / Jenerator","g","#aebfae","bakim"),
-    "T":("Toplanti","f","#e3dccb","toplanti"),
-    "W":("Islak Koridor",".","#aeb7c2","islak"),
-    "N":("Yaratigin Ini",".","#c89a96","yaratik"),
-    "E":("CIKIS","g","#9fdcb0","cikis"),
-}
-# Kapi ile baglanan oda ciftleri (diger tum oda-oda sinirlari duvar olur).
-# Akis: Resepsiyon -> Koridor -> {Ofis, Arsiv, Bakim, Toplanti}; Bakim -> Islak -> Yaratik -> Cikis.
-KAPILAR = [("R","K"),("O","K"),("A","K"),("V","K"),("T","K"),
-           ("V","W"),("W","N"),("N","E")]
+# (id, ad, zemin, kroki_renk, isik_profili, [rect(i0,i1,j0,j1) inclusive ...])
+BOLGE = [
+    ("R", "Resepsiyon",        "g", "#d7dbe0", "lobi",    [(1,5,2,9)]),
+    ("O", "Acik Ofis",         "f", "#e7ded0", "ofis",    [(1,5,13,21)]),
+    ("a","Kuzey Koridor",     ".", "#cdd2bc", "koridor", [(6,7,3,23)]),
+    ("A", "Arsiv",             "f", "#d8cdb6", "arsiv",   [(8,15,2,8)]),
+    ("b","Dikey Koridor",     ".", "#cdd2bc", "koridor", [(8,19,16,17)]),
+    ("V", "Bakim / Jenerator", "g", "#aebfae", "bakim",   [(9,15,18,26)]),
+    ("Z", "Kazan Dairesi",     "g", "#c2a594", "kazan",   [(9,15,27,35)]),
+    ("c","Orta Koridor",      ".", "#cdd2bc", "koridor", [(20,21,3,34)]),
+    ("T", "Toplanti",          "f", "#e3dccb", "toplanti",[(22,27,2,10)]),
+    ("W", "Islak Koridor",     ".", "#aeb7c2", "islak",   [(22,30,16,20)]),
+    ("P", "Otopark / Depo",    "f", "#ded6c6", "otopark", [(22,30,21,33)]),
+    ("d","Guney Koridor",     ".", "#cdd2bc", "koridor", [(31,32,9,30)]),
+    ("N", "Yaratigin Ini",     ".", "#c89a96", "yaratik", [(33,38,11,24)]),
+    ("E", "CIKIS",             "g", "#9fdcb0", "cikis",   [(33,37,25,32)]),
+]
+
+# ===== GRID'i tasarlanmis bolgelerden insa et =====
+GRID = [['.' for _ in range(W)] for _ in range(H)]
+ODA = {}          # id -> (ad, zemin, renk, isik)
+_hc = {}          # id -> [(i,j) ...]
+for _rid, _ad, _zem, _renk, _isik, _rects in BOLGE:
+    ODA[_rid] = (_ad, _zem, _renk, _isik)
+    _cs = []
+    for (i0, i1, j0, j1) in _rects:
+        for i in range(i0, i1 + 1):
+            for j in range(j0, j1 + 1):
+                GRID[i][j] = _rid; _cs.append((i, j))
+    _hc[_rid] = _cs
+NR, NC = H, W
+
+# Kapi baglantilari (akis). Komsu olan bu id ciftlerinde kapi acilir; gerisi duvar.
+KAPILAR = [("R","a"),("O","a"),("a","A"),("a","b"),
+           ("b","V"),("V","Z"),("b","c"),
+           ("c","T"),("c","W"),("c","P"),("W","P"),
+           ("W","d"),("P","d"),("d","N"),("N","E")]
 KAPI_SET = set(tuple(sorted(p)) for p in KAPILAR)
 
-# Objeler: (parca, hucre(i,j), oda-ici offset(dx,dz) m, derece [, scale(sx,sy,sz)])
-OBJELER = [
-    # --- RESEPSIYON / LOBI (R): gorkemli tas sutunlar + guvenlik (duzenli, "normal") ---
-    ("Sutun1",(1,1),(0.0,-1.2),0,(1.3,2.85,1.3)), ("Sutun2",(1,4),(0.0,-1.2),0,(1.3,2.85,1.3)),
-    ("Sutun3",(2,1),(0.0, 1.2),0,(1.3,2.85,1.3)), ("Sutun1",(2,4),(0.0, 1.2),0,(1.3,2.85,1.3)),
-    ("GuvenlikKamerasi",(0,1),(-1.4,-1.4),135), ("GuvenlikKamerasi",(0,4),(1.4,-1.4),225),
-    ("CopKutusu",(2,2),(0.8,1.3),0),
-    # --- ACIK OFIS (O): dagilmis, terk edilmis ---
-    ("ElektrikPanosu",(1,9),(1.6,0.0),270), ("CopKutusu",(1,7),(1.0,1.0),0),
-    ("CopKutusu",(2,9),(-1.2,1.2),0), ("GuvenlikKamerasi",(0,9),(1.4,-1.4),225),
-    # --- ANA KORIDOR (K): uc kameralari + havalandirma mazgallari ---
-    ("GuvenlikKamerasi",(4,0),(-1.4,0),90), ("GuvenlikKamerasi",(4,9),(1.4,0),270),
-    ("Mazgal",(4,2),(0,1.6),0), ("Mazgal",(4,7),(0,-1.6),0),
-    # --- ARSIV (A): karanlik, tozlu ---
-    ("CopKutusu",(6,0),(1.0,0),0), ("ElektrikPanosu",(5,1),(1.6,0),270),
-    # --- BAKIM / JENERATOR (V): sanayi yogun, elektrik panolari ---
-    ("ElektrikPanosu",(5,3),(0,-1.6),180), ("ElektrikPanosu",(5,4),(0,-1.6),180),
-    ("ElektrikPanosu",(6,3),(-1.6,0),90), ("Mazgal",(6,4),(0,0),0),
-    # --- TOPLANTI (T) ---
-    ("CopKutusu",(5,6),(1.2,1.2),0), ("CopKutusu",(6,7),(-1.0,-1.0),0),
-    # --- ISLAK KORIDOR (W): sizinti, mazgallar ---
-    ("Mazgal",(7,3),(0,0),0), ("Mazgal",(8,3),(0,0),0), ("CopKutusu",(7,4),(1.0,0),0),
-    # --- YARATIGIN INI (N): CANAVAR + girip ciktigi delikler + kirik kamera ---
-    ("Canavar",(9,7),(0.0,0.0),200),
-    ("Mazgal",(8,5),(0,0),0), ("Mazgal",(9,6),(0,0),0), ("Mazgal",(8,7),(0,0),0),
-    ("GuvenlikKamerasi",(8,4),(-1.4,-1.4),120), ("CopKutusu",(9,5),(-1.0,1.0),0),
-    # --- CIKIS (E) ---
-    ("GuvenlikKamerasi",(9,9),(1.2,-1.4),250),
-]
+def _bb(rid_):
+    cs = _hc[rid_]; ii = [c[0] for c in cs]; jj = [c[1] for c in cs]
+    return min(ii), max(ii), min(jj), max(jj)
+
+# ===== OBJELER: bolge tipine gore DESENLI (rastgele DEGIL) yerlestirme =====
+OBJELER = []
+def _o(part, i, j, dx, dz, rot, scale=None):
+    OBJELER.append((part, (i, j), (dx, dz), rot) + ((scale,) if scale else ()))
+
+# Resepsiyon: 4 gorkemli tas sutun + giris kameralari + cop
+i0,i1,j0,j1 = _bb("R")
+for s,(ci,cj) in zip(["Sutun1","Sutun2","Sutun3","Sutun1"],
+                     [(i0+1,j0+1),(i0+1,j1-1),(i1-1,j0+1),(i1-1,j1-1)]):
+    _o(s, ci, cj, 0,0, 0, (1.3,2.85,1.3))
+_o("GuvenlikKamerasi", i0,j0, 1.4,-1.4,135); _o("GuvenlikKamerasi", i0,j1, -1.4,-1.4,225)
+_o("CopKutusu", i1,(j0+j1)//2, 0.8,1.0,0)
+# Acik Ofis: panolar + kamera + cop (terk)
+i0,i1,j0,j1 = _bb("O")
+_o("ElektrikPanosu", i0,j1, 1.4,0,270); _o("GuvenlikKamerasi", i0,j1, -1.4,-1.4,225)
+_o("CopKutusu", i0+1,j0+1, 0,0,0); _o("CopKutusu", i1,j1, 0,0,0)
+# Koridorlar: uc kameralari + duzenli havalandirma mazgallari
+for kid in ["a","b","c","d"]:
+    cs = _hc[kid]; a=cs[0]; b=cs[-1]
+    _o("GuvenlikKamerasi", a[0],a[1], 0,0, 90); _o("GuvenlikKamerasi", b[0],b[1], 0,0, 270)
+    for k in range(3, len(cs), 6):
+        _o("Mazgal", cs[k][0], cs[k][1], 0,0,0)
+# Arsiv: pano + kutular (karanlik)
+i0,i1,j0,j1 = _bb("A")
+_o("ElektrikPanosu", i0,j0, 1.4,0,270); _o("CopKutusu", i1,j1, 0,0,0); _o("CopKutusu", (i0+i1)//2,j0, 1.0,0,0)
+# Bakim/Jenerator: cok pano + mazgal (sanayi)
+i0,i1,j0,j1 = _bb("V")
+_o("ElektrikPanosu", i0,j0, 0,-1.4,180); _o("ElektrikPanosu", i0,j0+2, 0,-1.4,180); _o("ElektrikPanosu", i0,j0+4, 0,-1.4,180)
+_o("Mazgal", (i0+i1)//2,(j0+j1)//2, 0,0,0); _o("CopKutusu", i1,j1, 0,0,0)
+# Kazan Dairesi: panolar + mazgallar (turuncu)
+i0,i1,j0,j1 = _bb("Z")
+_o("ElektrikPanosu", i1,j0, -1.4,0,90); _o("ElektrikPanosu", i1,j1, 1.4,0,270)
+_o("Mazgal", i0+1,j0+1, 0,0,0); _o("Mazgal", i1-1,j1-1, 0,0,0)
+# Toplanti: kutular + kamera
+i0,i1,j0,j1 = _bb("T")
+_o("CopKutusu", i0,j0, 0,0,0); _o("CopKutusu", i1,j1, 0,0,0); _o("GuvenlikKamerasi", i0,j1, -1.4,-1.4,225)
+# Islak Koridor: yogun mazgal (sizinti) + kutu
+for k,(ci,cj) in enumerate(_hc["W"]):
+    if k % 3 == 0: _o("Mazgal", ci,cj, 0,0,0)
+i0,i1,j0,j1 = _bb("W"); _o("CopKutusu", i1,j0, 0,0,0)
+# Otopark/Depo: kameralar + kutular + pano + mazgal (genis)
+i0,i1,j0,j1 = _bb("P")
+_o("GuvenlikKamerasi", i0,j0, 1.4,-1.4,135); _o("GuvenlikKamerasi", i0,j1, -1.4,-1.4,225)
+_o("CopKutusu", i1,j0+1, 0,0,0); _o("CopKutusu", i1,j1-1, 0,0,0)
+_o("Mazgal", (i0+i1)//2,(j0+j1)//2, 0,0,0); _o("ElektrikPanosu", i1,j1, 1.4,0,270)
+# Yaratigin Ini: CANAVAR + girip ciktigi delikler + kirik kamera + kutu
+i0,i1,j0,j1 = _bb("N")
+_o("Canavar", i1-1,(j0+j1)//2, 0,0, 200)
+for (ci,cj) in [(i0,j0+1),(i0,j1-1),((i0+i1)//2,j0),((i0+i1)//2,j1)]:
+    _o("Mazgal", ci,cj, 0,0,0)
+_o("GuvenlikKamerasi", i0,j0, 1.4,-1.4,120); _o("CopKutusu", i1,j0, 0,0,0)
+# Cikis: kamera
+i0,i1,j0,j1 = _bb("E")
+_o("GuvenlikKamerasi", i0,j1, -1.4,-1.4,250)
 
 # ==================================================================== TUREME
 def cell_center(i,j): return (j*CELL, i*CELL)
@@ -152,8 +194,11 @@ for i in range(NR):
         add_inst("Tavan2", x, z, 0.0, y=Y0+WALL_H)
         # tavan lambasi + omni (her hucre)
         add_inst("EndustriyelLamba", x, z, 90.0 if (i+j)%2 else 0.0, y=Y0+WALL_H-0.28)
-        col_, en_, rng_ = ISIK[ODA[r][3]]            # bolgeye gore atmosfer isigi
-        lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_,"range":rng_})
+        # SAHTE LAMBA optimizasyonu (#9): lamba mesh'i her hucrede ama gercek OmniLight
+        # 2 hucrede 1 -> sahte lambalar komsu isigi paylasir; isik sayisi ~yariya iner.
+        if (i + j) % 2 == 0:
+            col_, en_, rng_ = ISIK[ODA[r][3]]        # bolgeye gore atmosfer isigi
+            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*1.25,"range":rng_})
 
 # ---- DUVARLAR + KAPILAR (kenar bazli)
 def wall_part_for(r1,r2):
@@ -225,7 +270,7 @@ for o in OBJELER:
 import random
 random.seed(7)
 floor_cells = [(i,j) for i in range(NR) for j in range(NC) if rid(i,j)]
-for _ in range(150):
+for _ in range(int(len(floor_cells)*1.6)):
     i,j = random.choice(floor_cells)
     x,z = cell_center(i,j)
     px = x + random.uniform(-1.8,1.8); pz = z + random.uniform(-1.8,1.8)
@@ -235,7 +280,7 @@ for _ in range(150):
                    "rot":round(random.uniform(0,360),1)})
 
 # ---- OYUNCU SPAWN (resepsiyon ortasi)
-sx,sz = cell_center(1,2); spawn=[sx, Y0+1.0, sz]
+sx,sz = cell_center(3,5); spawn=[sx, Y0+1.0, sz]
 
 # ==================================================================== JSON
 plan = {
