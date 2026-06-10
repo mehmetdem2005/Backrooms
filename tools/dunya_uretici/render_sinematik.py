@@ -152,11 +152,11 @@ if DOLLHOUSE:
     w.node_tree.nodes["Background"].inputs[1].default_value=0.5
 
 if istendi("lobi"):
-    kamera(g2b((2.5,1.7,0)), g2b((26,1.45,0)), 26); render("/tmp/dunya_lobi.png")
+    kamera(g2b((6,1.7,1.5)), g2b((13,1.5,6)), 26); render("/tmp/dunya_lobi.png")
 if istendi("koridor"):
-    kamera(g2b((1,1.6,8)),   g2b((28,1.5,8)), 24); render("/tmp/dunya_koridor.png")
-if istendi("salon"):
-    kamera(g2b((8.6,1.7,10.6)), g2b((14.5,1.3,15)), 30); render("/tmp/dunya_salon.png")
+    kamera(g2b((1,1.6,16)),  g2b((34,1.5,16)), 22); render("/tmp/dunya_koridor.png")
+if istendi("yaratik"):
+    kamera(g2b((15,1.7,30)), g2b((28,1.2,35)), 30); render("/tmp/dunya_yaratik.png")
 if istendi("izometrik"):
-    kamera(g2b((32,24,-10)), g2b((13,0,10)), 34); render("/tmp/dunya_izometrik.png")
+    kamera(g2b((46,40,-9)), g2b((17,0,17)), 33); render("/tmp/dunya_izometrik.png")
 print(">>> BITTI")
