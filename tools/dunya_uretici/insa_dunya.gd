@@ -32,6 +32,7 @@ func _init() -> void:
 	for st in plan["stains"]:
 		_leke(st)
 	_oyuncu(plan["spawn"])
+	_chunk_yonetici()
 
 	var ps := PackedScene.new()
 	var hata := ps.pack(kok)
@@ -85,6 +86,9 @@ func _isik(lt: Dictionary) -> void:
 	var c: Array = lt["color"]; o.light_color = Color(c[0], c[1], c[2])
 	o.light_energy = lt["energy"]; o.omni_range = lt["range"]
 	o.shadow_enabled = false
+	o.distance_fade_enabled = true
+	o.distance_fade_begin = 22.0
+	o.distance_fade_length = 8.0
 	grup_isik.add_child(o); o.owner = kok
 
 func _leke(st: Dictionary) -> void:
@@ -120,7 +124,7 @@ func _ortam() -> void:
 	env.fog_density = 0.025
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
-	env.ssao_enabled = true
+	env.ssao_enabled = false   # mobil perf (Faz2)
 	we.environment = env
 	kok.add_child(we); we.owner = kok
 
@@ -141,3 +145,10 @@ func _oyuncu(spawn: Array) -> void:
 	sp.position = Vector3(0, 1.6, 0)
 	sp.light_energy = 2.0; sp.spot_range = 14.0; sp.spot_angle = 35.0
 	cam.add_child(sp); sp.owner = kok
+
+func _chunk_yonetici() -> void:
+	var cy := Node.new(); cy.name = "ChunkYonetici"
+	cy.set_script(load("res://addons/chunk/ChunkYonetici.gd"))
+	kok.add_child(cy); cy.owner = kok
+	cy.set("oyuncu_yolu", NodePath("../Oyuncu"))
+	cy.set("chunk", 14.0); cy.set("yaricap", 3)

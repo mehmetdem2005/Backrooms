@@ -139,9 +139,9 @@ for i in range(NR):
         add_inst(FLOOR_TEX[ODA[r][1]], x,z,0.0,y=Y0,col=[4,0.12,4,0.0])
         add_inst("Tavan2", x,z,0.0,y=Y0+WALL_H)
         add_inst("EndustriyelLamba", x,z,90.0 if (i+j)%2 else 0.0,y=Y0+WALL_H-0.28)
-        if (i+j)%2==0:
+        if i%3==1 and j%3==1:               # ISIK OPT (Faz2): 9 hucrede 1 gercek isik
             col_,en_,rng_=ISIK[ODA[r][3]]
-            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*1.25,"range":rng_})
+            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*2.6,"range":rng_*1.5})
 
 # DUVAR + KAPI (kenar bazli; KAPI_SET ciftlerinde kapi)
 _ind=set(r for r in TEMA_OF if TEMA_OF[r] in ("bakim","kazan","yaratik","arsiv","islak","lab","morg"))
