@@ -407,6 +407,26 @@
    "dosyalar": ["addons/hile_odasi/HileOdasi.gd (yeni)", "Dunya.tscn"]
   },
   {
+   "id": 29, "baslik": "Gercek backrooms: DUZENSIZ prosedurel harita (izgara DEGIL)", "oncelik": "kritik", "durum": "yapiliyor",
+   "kaynak_promt": "duzenli istemiyorum gercek backrooms istiyorum, krokisi bile rahatsiz edici olsun, daha cesitli ve fazlasi",
+   "yaklasim": "Elle dikdortgen-izgara YERINE tohumlanmis (deterministik) prosedurel uretim: rastgele boyut/konumlu COK sayida oda + aralarinda VOID icinden KIVRILAN koridor agi (MST + ekstra dongu kenarlari) -> kaotik labirent. Koridor acik, odalara oto kapi, salonlar acik. Kroki KARANLIK/tedirgin edici stilde cizilir (siyah zemin, kirmizi vurgular).",
+   "kabul_kriteri": "Harita izgara gibi DEGIL; duzensiz, cesitli, labirentvari; kroki bile rahatsiz edici; baglanti dogrulanir.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 30, "baslik": "Iki katli harita + merdivenler", "oncelik": "yuksek", "durum": "yapilacak (sirada)",
+   "kaynak_promt": "iki katli olsun merdivenler olsun",
+   "yaklasim": "Iki bagimsiz duzensiz kat (Kat0 y=0, Kat1 y=WALL_H+~0.5). Merdiven kovasi: iki katta da koridor olan ortak (i,j) noktalarinda merdiven (basamak kutulari ya da rampa) + ust kat zemininde delik. Insa pipeline'i kat-dongusune cevrilir (her instance kat-y ofseti). Navigasyon iki katta gecerli.",
+   "alt_sistemler": {
+    "kat_uretimi": "Generator iki kez calisir (farkli seed) -> iki kat grid.",
+    "merdiven": "Stairwell sahti: 2x3 hucre, basamak StaticBody dizisi (tirmanabilir) + ust kat zemin deligi + korkuluk.",
+    "insa": "insa_dunya.gd: plan 'floors' listesi; her kat y_base ile basilir.",
+    "gecis": "Oyuncu merdivenden cikar; canavar navmesh iki katta (link)."
+   },
+   "kabul_kriteri": "Iki kat var, merdivenle gecilir; oyuncu cikabilir; canavar takip edebilir.",
+   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "tools/dunya_uretici/insa_dunya.gd", "parts/Merdiven.tscn (yeni)"]
+  },
+  {
    "id": 28, "baslik": "Korkunc/psikolojik altyazilar", "oncelik": "orta", "durum": "yapilacak (Faz 4)",
    "kaynak_promt": "altta korkunc psikoloji bozan altyazi da ekle",
    "yaklasim": "Ekran altinda ara ara beliren rahatsiz edici ic-ses/fisilti altyazilari (canavarin ya da mekanin sesi). Tetik: bolgeye girme, canavar yakinligi, dongu sayisi. Ornek: 'Buraya daha once geldin.' / 'Cikis yok. Hic olmadi.' / 'Korktugunda daha lezzetli oluyorsun.' Yazi titreme/glitch efekti.",
