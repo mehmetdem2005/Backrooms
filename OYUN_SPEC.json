@@ -379,6 +379,39 @@
    },
    "kabul_kriteri": "Oyun acilista kontrol kapali sinematikle baslar: kirpma->uyanma->canavar yuzde->bagiris+replik->birakma->10 sayim->av baslar; canavar animasyonlu, ses rahatsiz edici.",
    "dosyalar": ["sahneler/AcilisSinematik.tscn (yeni)", "sahneler/sinematik.gd (yeni)", "parts/Canavar.tscn", "parts/canavar.gd", "addons/ses/SesYonetici.gd", "Dunya.tscn (oyun durumu)"]
+  },
+  {
+   "id": 25, "baslik": "Cikissiz dongu (exitless loop)", "oncelik": "yuksek", "durum": "yapilacak (Faz 1 sonrasi)",
+   "kaynak_promt": "cikissiz dongu olsun",
+   "yaklasim": "Harita topolojisi zaten koridor ring/izgara dongusu. 'CIKIS' kapisindan gecince oyuncu sinsice baska bir baslangic/benzer bolgeye GERI dondurulur (teleport + hafif sahne degisimi) -> gercek cikis yok, kacis yanilsamasi. Korku: ayni yere tekrar varma.",
+   "alt_sistemler": {
+    "loop_teleport": "E (cikis) trigger -> fade -> oyuncu baska bir koridor agzina spawn; bazi objeler/leke degisir ki 'ayni ama farkli' hissi olsun.",
+    "ipuclari": "Tekrar eden landmark, daha once gordugun leke/yazi -> dongu farkindaligi.",
+    "son": "Belli dongu sayisindan sonra ya kotu son (canavar yakalar) ya da gizli gercek cikis (opsiyonel)."
+   },
+   "kabul_kriteri": "Cikistan gecmek oyuncuyu basa/benzer bolgeye dondurur; gercek kacis yok hissi.",
+   "dosyalar": ["sahneler/dongu.gd (yeni)", "Dunya.tscn", "tools/dunya_uretici/dunya_uret.py"]
+  },
+  {
+   "id": 26, "baslik": "Siyah/dokusuz duvar arkasi (backface) duzeltme", "oncelik": "orta", "durum": "yapilacak (Faz 1/2)",
+   "kaynak_promt": "bazi duvarlarin arkasi siyah doku yok duzelt",
+   "yaklasim": "Duvar mesh'leri tek yuzlu/cull_back oldugundan arkadan bakinca siyah/seffaf gorunuyor. Cozum: duvar materyalini cull_disabled (iki yuzlu) yap VEYA duvarlari iki yuzlu kutu olarak uret; dis sinir duvarlarinin ic yuzune de doku.",
+   "kabul_kriteri": "Hicbir duvar arkadan siyah/dokusuz gorunmez.",
+   "dosyalar": ["parts/Duvar.tscn", "parts/Duvar2.tscn", "*_material.tres", "tools/dunya_uretici/insa_dunya.gd"]
+  },
+  {
+   "id": 27, "baslik": "Odalar oyun oynasin (mekan hilekarligi)", "oncelik": "orta", "durum": "yapilacak (Faz 4)",
+   "kaynak_promt": "bazi odalar bize oyun oynasin",
+   "yaklasim": "Belirli odalarda 'reality glitch': arkana donunce kapi/esya yer degistirir, isik aniden soner, ayni odaya tekrar girme (non-Euclidean), sahte cikis, kisa figur belirip kaybolma, sesli fisilti. Tetik: AreaTrigger + zamanlayici, ender ve dengeli.",
+   "kabul_kriteri": "Bazi odalar girince ongorulemez sekilde degisir; tedirgin edici ama adil.",
+   "dosyalar": ["addons/hile_odasi/HileOdasi.gd (yeni)", "Dunya.tscn"]
+  },
+  {
+   "id": 28, "baslik": "Korkunc/psikolojik altyazilar", "oncelik": "orta", "durum": "yapilacak (Faz 4)",
+   "kaynak_promt": "altta korkunc psikoloji bozan altyazi da ekle",
+   "yaklasim": "Ekran altinda ara ara beliren rahatsiz edici ic-ses/fisilti altyazilari (canavarin ya da mekanin sesi). Tetik: bolgeye girme, canavar yakinligi, dongu sayisi. Ornek: 'Buraya daha once geldin.' / 'Cikis yok. Hic olmadi.' / 'Korktugunda daha lezzetli oluyorsun.' Yazi titreme/glitch efekti.",
+   "kabul_kriteri": "Belli anlarda ekran altinda tedirgin edici altyazi belirir; atmosfere uyumlu.",
+   "dosyalar": ["arayuz/Altyazi.tscn (yeni)", "arayuz/altyazi.gd (yeni)", "Dunya.tscn"]
   }
  ],
 
