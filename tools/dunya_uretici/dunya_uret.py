@@ -53,42 +53,49 @@ THEME={
  "yaratik":(".","#c89a96"),"cikis":("g","#9fdcb0"),"lab":("g","#bcd0cf"),"morg":(".","#9aa0a6"),
 }
 
-# ===================================================== 2 KANAT
-H, W = 40, 80
-WMIR = 38; DX_B = 42      # B kanadi: aynalama genisligi + saga ofset
-# BASE sablon (Kanat A yerlesimi) - (id, [rect(i0,i1,j0,j1)])
-BASE=[
+# ===================================================== 2 KANAT (A + Gecit + B, B FARKLI tasarim)
+H, W = 44, 82
+DX_B = 44                 # B kanadi saga ofset
+# Kanat A (id, [rect]) - orijinal sevilen yerlesim
+A_BASE=[
  ("R",[(1,5,2,9)]), ("O",[(1,5,13,21)]), ("a",[(6,7,3,23)]), ("A",[(8,15,2,8)]),
  ("b",[(8,19,16,17)]), ("V",[(9,15,18,26)]), ("Z",[(9,15,27,35)]), ("c",[(20,21,3,34)]),
  ("T",[(22,27,2,10)]), ("W",[(22,30,16,20)]), ("P",[(22,30,21,33)]), ("d",[(31,32,9,30)]),
- ("N",[(33,38,11,24)]), ("E",[(33,37,25,32)]),
+ ("N",[(33,40,11,24)]), ("E",[(33,39,25,32)]),
 ]
 A_META={ "R":("Resepsiyon","lobi"),"O":("Acik Ofis","ofis"),"a":("Kuzey Koridor","koridor"),
  "A":("Arsiv","arsiv"),"b":("Dikey Koridor","koridor"),"V":("Bakim / Jenerator","bakim"),
  "Z":("Kazan Dairesi","kazan"),"c":("Orta Koridor","koridor"),"T":("Toplanti","toplanti"),
  "W":("Islak Koridor","islak"),"P":("Otopark / Depo","otopark"),"d":("Guney Koridor","koridor"),
  "N":("Yaratigin Ini","yaratik"),"E":("CIKIS","cikis") }
-# B kanadi: A_id -> (B_id, ad, tema)  [FARKLI bolum: arastirma/tip/lojistik]
-B_MAP={ "R":("G","Ikinci Lobi","lobi"),"O":("S","Sunucu Odasi","lab"),"a":("e","Bati Koridor","koridor"),
- "A":("L","Laboratuvar","lab"),"b":("f","B-Dikey Koridor","koridor"),"V":("Y","Revir","ofis"),
- "Z":("Q","Karantina","islak"),"c":("g","Dogu-Orta Koridor","koridor"),"T":("U","Yemekhane","toplanti"),
- "W":("I","Tuvalet Koridoru","islak"),"P":("X","Ambar","otopark"),"d":("h","B-Guney Koridor","koridor"),
- "N":("J","Morg","morg"),"E":("K","Kontrol Odasi","ofis") }
 
-def xform(rects,mirror,dx):
-    out=[]
-    for (i0,i1,j0,j1) in rects:
-        if mirror: nj0,nj1=(WMIR-1-j1),(WMIR-1-j0)
-        else: nj0,nj1=j0,j1
-        out.append((i0,i1,nj0+dx,nj1+dx))
-    return out
+# Kanat B — FARKLI tasarim (ayna DEGIL): kendine ozgu "merdiven" koridor agi (3 yatay + 2 dikey
+# ray) + farkli oda boyut/dizilimi, arastirma/tip/lojistik temasi. B-yerel koord; DX_B ile otelenir.
+# Cizim sirasi: once odalar, sonra yatay koridorlar, EN SON dikey raylar (kesisimleri kazansin).
+B_BASE=[
+ ("G",[(1,8,1,10)]),    ("S",[(1,8,12,21)]),  ("L",[(1,8,23,31)]),     # ust bant odalar
+ ("Y",[(11,19,3,11)]),  ("U",[(11,19,13,21)]),("C",[(11,19,23,29)]),   # orta-ust bant
+ ("Q",[(22,30,3,11)]),  ("X",[(22,30,13,21)]),("I",[(22,30,23,29)]),   # orta-alt bant
+ ("J",[(33,40,1,14)]),  ("K",[(33,40,16,31)]),                          # alt bant
+ ("p",[(9,10,1,31)]),   ("q",[(20,21,1,31)]), ("s",[(31,32,1,31)]),     # yatay raylar
+ ("e",[(9,32,1,2)]),    ("r",[(9,32,30,31)]),                           # dikey raylar (en son)
+]
+B_META={ "G":("Ikinci Lobi","lobi"),"S":("Sunucu Odasi","lab"),"L":("Laboratuvar","lab"),
+ "Y":("Revir","ofis"),"U":("Yemekhane","toplanti"),"C":("Kontrol Odasi","ofis"),
+ "Q":("Karantina","islak"),"X":("Ambar","otopark"),"I":("Sizinti Odasi","islak"),
+ "J":("Morg","morg"),"K":("Atik Isleme","kazan"),
+ "p":("B-Kuzey Koridor","koridor"),"q":("B-Orta Koridor","koridor"),"s":("B-Guney Koridor","koridor"),
+ "e":("Bati Koridor","koridor"),"r":("Dogu Koridor","koridor") }
+
+def shift(rects,dx,dj):
+    return [(i0,i1,j0+dj,j1+dj) for (i0,i1,j0,j1) in rects]
 
 BOLGE=[]   # (id, ad, tema, rects)
-for (aid,rects) in BASE:
-    nm,th=A_META[aid]; BOLGE.append((aid,nm,th,xform(rects,False,0)))
-for (aid,rects) in BASE:
-    bid,nm,th=B_MAP[aid]; BOLGE.append((bid,nm,th,xform(rects,True,DX_B)))
-BOLGE.append(("M","Gecit Koridoru","koridor",[(20,21,35,44)]))   # iki kanadi baglar
+for (aid,rects) in A_BASE:
+    nm,th=A_META[aid]; BOLGE.append((aid,nm,th,rects))
+for (bid_,rects) in B_BASE:
+    nm,th=B_META[bid_]; BOLGE.append((bid_,nm,th,shift(rects,0,DX_B)))
+BOLGE.append(("M","Gecit Koridoru","koridor",[(20,21,35,DX_B+1)]))   # A Orta <-> B
 
 GRID=[['.' for _ in range(W)] for _ in range(H)]
 ODA={}; TEMA_OF={}; _hc={}
@@ -102,13 +109,13 @@ for (rid_,nm,th,rects) in BOLGE:
     _hc[rid_]=cs
 NR,NC=H,W
 
-# KAPILAR: A + B(mapli) + gecit
+# KAPILAR: A + B + gecit
 A_KAP=[("R","a"),("O","a"),("a","A"),("a","b"),("b","V"),("V","Z"),("b","c"),
        ("c","T"),("c","W"),("c","P"),("W","P"),("W","d"),("P","d"),("d","N"),("N","E")]
-bid=lambda a: B_MAP[a][0]
-KAPILAR=list(A_KAP)
-for (x,y) in A_KAP: KAPILAR.append((bid(x),bid(y)))
-KAPILAR += [("c","M"),("M","g")]                 # gecit: A Orta Koridor <-> M <-> B Orta Koridor
+B_KAP=[("G","p"),("S","p"),("L","p"),("Y","e"),("U","p"),("C","r"),
+       ("Q","e"),("X","q"),("I","r"),("J","s"),("K","s"),
+       ("p","e"),("p","r"),("q","e"),("q","r"),("s","e"),("s","r")]   # merdiven koridor agi
+KAPILAR = A_KAP + B_KAP + [("c","M"),("M","e")]   # gecit: A Orta Koridor <-> M <-> B Bati Koridor
 KAPI_SET=set(tuple(sorted(p)) for p in KAPILAR)
 
 def cell_center(i,j): return (j*CELL,i*CELL)
