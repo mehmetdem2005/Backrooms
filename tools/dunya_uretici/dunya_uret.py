@@ -31,6 +31,7 @@ PARTS={
  "CopKutusu":{"kind":"glb","glb":"models/cop_kutusu.glb","yoff":0.49,"col":[0.6,0.98,0.6]},
  "ElektrikPanosu":{"kind":"glb","glb":"models/elektrik_panosu.glb","yoff":0.49,"col":[0.28,0.98,0.68]},
  "Canavar":{"kind":"glb","glb":"models/canavar.glb","yoff":0.0,"col":None},
+ "Pil":{"kind":"pickup","col":None},
  "Sutun1":{"kind":"glb","glb":"models/sutun1.glb","yoff":0.0,"col":[0.35,1.0,0.35]},
  "Sutun2":{"kind":"glb","glb":"models/sutun2.glb","yoff":0.0,"col":[0.4,1.0,0.4]},
  "Sutun3":{"kind":"glb","glb":"models/sutun3.glb","yoff":0.0,"col":[0.3,1.0,0.3]},
@@ -218,6 +219,13 @@ def themed(r):
     elif th=="cikis":
         _o("GuvenlikKamerasi",i0,j1,-1.4,-1.4,250)
 for r in ODA: themed(r)
+# PIL DAGIT: bazi odalarin merkezine fener pili (desenli, her 3. oda)
+_oda_say=0
+for r in ODA:
+    if TEMA_OF[r]=="koridor": continue
+    _oda_say+=1
+    if _oda_say%3==0:
+        i0,i1,j0,j1=_bb(r); _o("Pil",(i0+i1)//2,(j0+j1)//2,0,0,0)
 for o in OBJELER:
     part,(i,j),(dx,dz),rot=o[0],o[1],o[2],o[3]
     scl=tuple(o[4]) if len(o)>4 else (1,1,1)
