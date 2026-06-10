@@ -24,7 +24,7 @@ func _ready() -> void:
 		if g == null:
 			continue
 		for c in g.get_children():
-			if c is Node3D:
+			if c is Node3D and not c.name.begins_with("Canavar"):
 				var k := _key((c as Node3D).global_position)
 				if not _chunklar.has(k):
 					_chunklar[k] = []
