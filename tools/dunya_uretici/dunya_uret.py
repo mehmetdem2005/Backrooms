@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
-# Backrooms - DUNYA URETICI (TASARLANMIS organik: koridor agi + oto bolunmus odalar)
+# Backrooms - DUNYA URETICI (TASARLANMIS, 2 KANAT yan yana)
 #   python3 tools/dunya_uretici/dunya_uret.py -> dunya_plan.json + krokiler/kat_zemin.png
 #
-# YAKLASIM: Koridor agi EL ILE tasarlandi (duzensiz/uneven + loop'lu + spur'lu -> organik,
-# izgara DEGIL, rastgele DEGIL). Koridor disi bosluklar otomatik ODALARA bolunur (flood-fill)
-# -> COK sayida, degisken boyutlu, hepsi koridora bagli oda. Koridor SERBEST gezilir,
-# odalara OTO kapi, salonlar kapisiz acilir. Bol ara-baglanti (loop).
+# Kullanici: "sevdigim tasarim (50d8415) gibi olsun ama 2 FARKLI tane yan yana koyup buyut."
+# -> Kanat A (orijinal: Resepsiyon/Ofis/Arsiv/Bakim/Kazan/Toplanti/Islak/Otopark/Yaratik/Cikis)
+#    + ORTA GECIT koridoru + Kanat B (A'nin AYNALANMISI, FARKLI odalar: Ikinci Lobi/Sunucu/
+#    Laboratuvar/Revir/Karantina/Yemekhane/Tuvalet/Ambar/Morg/Kontrol). Ayni stil, ~2x oda.
 
-import json, os
+import json, os, random
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Arc
 from matplotlib.lines import Line2D
-from collections import defaultdict, deque
 
 PROJE="/home/user/Backrooms"; OUT=os.path.join(PROJE,"tools","dunya_uretici")
 CELL,WALL_H,Y0=4.0,3.0,0.0; DOOR_W=1.42; FILL_W=(CELL-DOOR_W)/2.0
@@ -37,170 +36,113 @@ PARTS={
  "Sutun3":{"kind":"glb","glb":"models/sutun3.glb","yoff":0.0,"col":[0.3,1.0,0.3]},
 }
 FLOOR_TEX={".":"Zemin","g":"GriZemin","f":"FayansZemin"}
-# tema -> (ad_kok, zemin, kroki_renk, [isik_renk,enerji,menzil])
-TEMA={
- "lobi":("Resepsiyon","g","#cdd3da",[[1.00,0.96,0.88],3.0,7.0]),
- "salon":("Salon","g","#cfd6dd",[[0.96,0.94,0.86],2.7,7.2]),
- "ofis":("Ofis","f","#e7ded0",[[1.00,0.90,0.60],2.2,6.0]),
- "depo":("Depo","f","#ded6c6",[[0.80,0.78,0.62],1.4,5.4]),
- "arsiv":("Arsiv","f","#d8cdb6",[[0.92,0.74,0.50],1.3,5.0]),
- "bakim":("Bakim","g","#aebfae",[[0.55,0.95,0.68],2.0,6.0]),
- "kazan":("Kazan Dairesi","g","#c2a594",[[1.00,0.55,0.28],1.8,5.6]),
- "lab":("Laboratuvar","g","#bcd0cf",[[0.70,0.95,0.95],2.0,6.0]),
- "wc":("Tuvalet","f","#cdd6c8",[[0.86,0.90,0.84],1.6,5.0]),
- "islak":("Islak Koridor",".","#aeb7c2",[[0.48,0.60,0.80],1.1,4.8]),
- "yaratik":("Yaratigin Ini",".","#c89a96",[[0.95,0.32,0.28],1.1,5.2]),
- "cikis":("CIKIS","g","#9fdcb0",[[0.55,1.00,0.70],3.4,7.6]),
- "koridor":("Koridor",".","#cdd2bc",[[0.84,0.86,0.94],1.7,5.8]),
+ISIK={
+ "lobi":([1.00,0.96,0.88],3.4,7.0),"ofis":([1.00,0.90,0.60],2.4,6.2),
+ "koridor":([0.84,0.86,0.94],1.7,6.0),"arsiv":([0.92,0.74,0.50],1.2,5.0),
+ "bakim":([0.55,0.95,0.68],2.1,6.2),"kazan":([1.00,0.55,0.28],1.8,5.8),
+ "toplanti":([0.86,0.86,0.82],1.8,6.0),"islak":([0.48,0.60,0.80],1.0,4.8),
+ "otopark":([0.70,0.74,0.80],1.5,7.0),"yaratik":([0.95,0.32,0.28],1.2,5.5),
+ "cikis":([0.55,1.00,0.70],3.8,8.0),"lab":([0.70,0.95,0.95],2.2,6.2),
+ "morg":([0.50,0.55,0.62],1.0,4.8),
+}
+# tema -> (zemin, kroki_renk)
+THEME={
+ "lobi":("g","#d7dbe0"),"ofis":("f","#e7ded0"),"koridor":(".","#cdd2bc"),
+ "arsiv":("f","#d8cdb6"),"bakim":("g","#aebfae"),"kazan":("g","#c2a594"),
+ "toplanti":("f","#e3dccb"),"islak":(".","#aeb7c2"),"otopark":("f","#ded6c6"),
+ "yaratik":(".","#c89a96"),"cikis":("g","#9fdcb0"),"lab":("g","#bcd0cf"),"morg":(".","#9aa0a6"),
 }
 
-# ===================================================== KORIDOR AGI (el ile, organik/uneven + loop)
-H,W=60,56
+# ===================================================== 2 KANAT
+H, W = 40, 80
+WMIR = 38; DX_B = 42      # B kanadi: aynalama genisligi + saga ofset
+# BASE sablon (Kanat A yerlesimi) - (id, [rect(i0,i1,j0,j1)])
+BASE=[
+ ("R",[(1,5,2,9)]), ("O",[(1,5,13,21)]), ("a",[(6,7,3,23)]), ("A",[(8,15,2,8)]),
+ ("b",[(8,19,16,17)]), ("V",[(9,15,18,26)]), ("Z",[(9,15,27,35)]), ("c",[(20,21,3,34)]),
+ ("T",[(22,27,2,10)]), ("W",[(22,30,16,20)]), ("P",[(22,30,21,33)]), ("d",[(31,32,9,30)]),
+ ("N",[(33,38,11,24)]), ("E",[(33,37,25,32)]),
+]
+A_META={ "R":("Resepsiyon","lobi"),"O":("Acik Ofis","ofis"),"a":("Kuzey Koridor","koridor"),
+ "A":("Arsiv","arsiv"),"b":("Dikey Koridor","koridor"),"V":("Bakim / Jenerator","bakim"),
+ "Z":("Kazan Dairesi","kazan"),"c":("Orta Koridor","koridor"),"T":("Toplanti","toplanti"),
+ "W":("Islak Koridor","islak"),"P":("Otopark / Depo","otopark"),"d":("Guney Koridor","koridor"),
+ "N":("Yaratigin Ini","yaratik"),"E":("CIKIS","cikis") }
+# B kanadi: A_id -> (B_id, ad, tema)  [FARKLI bolum: arastirma/tip/lojistik]
+B_MAP={ "R":("G","Ikinci Lobi","lobi"),"O":("S","Sunucu Odasi","lab"),"a":("e","Bati Koridor","koridor"),
+ "A":("L","Laboratuvar","lab"),"b":("f","B-Dikey Koridor","koridor"),"V":("Y","Revir","ofis"),
+ "Z":("Q","Karantina","islak"),"c":("g","Dogu-Orta Koridor","koridor"),"T":("U","Yemekhane","toplanti"),
+ "W":("I","Tuvalet Koridoru","islak"),"P":("X","Ambar","otopark"),"d":("h","B-Guney Koridor","koridor"),
+ "N":("J","Morg","morg"),"E":("K","Kontrol Odasi","ofis") }
+
+def xform(rects,mirror,dx):
+    out=[]
+    for (i0,i1,j0,j1) in rects:
+        if mirror: nj0,nj1=(WMIR-1-j1),(WMIR-1-j0)
+        else: nj0,nj1=j0,j1
+        out.append((i0,i1,nj0+dx,nj1+dx))
+    return out
+
+BOLGE=[]   # (id, ad, tema, rects)
+for (aid,rects) in BASE:
+    nm,th=A_META[aid]; BOLGE.append((aid,nm,th,xform(rects,False,0)))
+for (aid,rects) in BASE:
+    bid,nm,th=B_MAP[aid]; BOLGE.append((bid,nm,th,xform(rects,True,DX_B)))
+BOLGE.append(("M","Gecit Koridoru","koridor",[(20,21,35,44)]))   # iki kanadi baglar
+
 GRID=[['.' for _ in range(W)] for _ in range(H)]
-def stamp(i0,i1,j0,j1,ch='c'):
-    for i in range(max(0,i0),min(H,i1+1)):
-        for j in range(max(0,j0),min(W,j1+1)): GRID[i][j]=ch
-# yatay koridorlar (uneven, kismi) -> tam izgara DEGIL, sik
-for (i0,i1,j0,j1) in [(7,8,2,53),(14,15,14,53),(21,22,2,45),(28,29,11,53),(34,35,2,41),(40,41,28,53),(46,47,2,47),(51,52,2,53)]:
-    stamp(i0,i1,j0,j1)
-# dikey koridorlar (uneven, kismi) -> sik
-for (i0,i1,j0,j1) in [(7,52,2,3),(7,29,9,10),(14,52,17,18),(7,41,25,26),(21,52,33,34),(7,47,40,41),(28,52,48,49)]:
-    stamp(i0,i1,j0,j1)
-# ara-baglantilar / spur (loop + organik kivrim, staggered)
-for (i0,i1,j0,j1) in [(8,14,46,47),(22,28,21,22),(29,40,43,44),(35,46,15,16),(15,21,30,31),(41,51,25,26),(8,21,52,53),(35,46,52,53)]:
-    stamp(i0,i1,j0,j1)
-
-# ===================================================== ODALAR: koridor disi bosluklari otomatik bol
-ODA={}; TIP={}; _rect={}; _hc={}
-_pool=[ch for ch in "ABDEFGIJKLMNOPQRSTUVWXYZabdefghijkmnopqrstuvwxyz0123456789"]; _pi=0
-def _yid():
-    global _pi; c=_pool[_pi]; _pi+=1; return c
-# 1 hucre ic kenar payi: dis sinir void kalsin
-for i in range(H):
-    for j in range(W):
-        if i==0 or j==0 or i>=H-1 or j>=W-1:
-            if GRID[i][j]=='.': pass
-# flood: ic (1..H-2,1..W-2) non-koridor bilesenler
-seen=[[False]*W for _ in range(H)]
-comps=[]
-for si in range(1,H-1):
-    for sj in range(1,W-1):
-        if GRID[si][sj]!='.' or seen[si][sj]: continue
-        cells=[]; q=deque([(si,sj)]); seen[si][sj]=True
-        while q:
-            i,j=q.popleft(); cells.append((i,j))
-            for di,dj in((0,1),(0,-1),(1,0),(-1,0)):
-                ni,nj=i+di,j+dj
-                if 1<=ni<H-1 and 1<=nj<W-1 and not seen[ni][nj] and GRID[ni][nj]=='.':
-                    seen[ni][nj]=True; q.append((ni,nj))
-        comps.append(cells)
-# kucuk slivar bilesenleri koridora kat (mikro-oda olmasin)
-rooms=[]
-for cells in comps:
-    if len(cells)<5:
-        for (i,j) in cells: GRID[i][j]='c'
-    else:
-        rooms.append(cells)
-
-def _bbx(cells):
-    ii=[c[0] for c in cells]; jj=[c[1] for c in cells]
-    return min(ii),max(ii),min(jj),max(jj)
-def _zone(i0,i1):
-    fr=((i0+i1)/2.0)/H
-    if fr<0.30: return ["ofis","ofis","depo","arsiv","wc"]
-    if fr<0.55: return ["arsiv","depo","ofis","lab","bakim"]
-    if fr<0.78: return ["bakim","lab","depo","islak","kazan"]
-    return ["kazan","islak","bakim","depo"]
-
-# ozel odalar: resepsiyon (en ust buyuk), ana salon (en buyuk), yaratik (en alt), cikis (uzak kose)
-rooms.sort(key=lambda c:_bbx(c)[0])
-import hashlib
-def _ci(c): i0,i1,j0,j1=_bbx(c); return ((i0+i1)//2,(j0+j1)//2)
-res_idx=0
-big_idx=max(range(len(rooms)),key=lambda k:len(rooms[k]))
-yar_idx=max(range(len(rooms)),key=lambda k:_ci(rooms[k])[0])
-cik_idx=max(range(len(rooms)),key=lambda k:_ci(rooms[k])[0]+_ci(rooms[k])[1])
-ozel={res_idx:"lobi"}
-if big_idx not in ozel: ozel[big_idx]="salon"
-ozel[yar_idx]="yaratik";
-if cik_idx not in (yar_idx,res_idx): ozel[cik_idx]="cikis"
-
-ad_say=defaultdict(int)
-spawn_cell=creature_cell=exit_cell=None
-rng_seed=12345
-for k,cells in enumerate(rooms):
-    i0,i1,j0,j1=_bbx(cells)
-    if k in ozel: th=ozel[k]
-    else:
-        pool=_zone(i0,i1); th=pool[(i0*7+j0*3+k)%len(pool)]   # deterministik (rastgele degil)
-    rid_=_yid()
-    tip="salon" if th in("lobi","salon") else "oda"
-    ad_say[th]+=1
-    ad=TEMA[th][0]+("" if th in("lobi","cikis","yaratik","salon") or ad_say[th]==1 else " %d"%ad_say[th])
-    ODA[rid_]=(th,ad); TIP[rid_]=tip; _rect[rid_]=(i0,i1,j0,j1); _hc[rid_]=cells
-    for (i,j) in cells: GRID[i][j]=rid_
-    cI,cJ=_ci(cells)
-    if th=="lobi": spawn_cell=(cI,cJ)
-    elif th=="yaratik": creature_cell=(min(i1, max(i0, i1-1)),cJ)
-    elif th=="cikis": exit_cell=(cI,cJ)
-
+ODA={}; TEMA_OF={}; _hc={}
+for (rid_,nm,th,rects) in BOLGE:
+    zem,renk=THEME[th]
+    ODA[rid_]=(nm,zem,renk,th); TEMA_OF[rid_]=th; cs=[]
+    for (i0,i1,j0,j1) in rects:
+        for i in range(i0,i1+1):
+            for j in range(j0,j1+1):
+                if 0<=i<H and 0<=j<W: GRID[i][j]=rid_; cs.append((i,j))
+    _hc[rid_]=cs
 NR,NC=H,W
-TEMA_OF={r:ODA[r][0] for r in ODA}
+
+# KAPILAR: A + B(mapli) + gecit
+A_KAP=[("R","a"),("O","a"),("a","A"),("a","b"),("b","V"),("V","Z"),("b","c"),
+       ("c","T"),("c","W"),("c","P"),("W","P"),("W","d"),("P","d"),("d","N"),("N","E")]
+bid=lambda a: B_MAP[a][0]
+KAPILAR=list(A_KAP)
+for (x,y) in A_KAP: KAPILAR.append((bid(x),bid(y)))
+KAPILAR += [("c","M"),("M","g")]                 # gecit: A Orta Koridor <-> M <-> B Orta Koridor
+KAPI_SET=set(tuple(sorted(p)) for p in KAPILAR)
+
 def cell_center(i,j): return (j*CELL,i*CELL)
 def rid(i,j):
     if 0<=i<NR and 0<=j<NC and GRID[i][j]!='.': return GRID[i][j]
     return None
-def theme_of(r): return "koridor" if r=='c' else TEMA_OF.get(r,"koridor")
-def name_of(r): return "Koridor" if r=='c' else ODA[r][1]
-def floor_of(r): return FLOOR_TEX[TEMA[theme_of(r)][1]]
+def _bb(r):
+    cs=_hc[r]; ii=[c[0] for c in cs]; jj=[c[1] for c in cs]; return min(ii),max(ii),min(jj),max(jj)
 
 instances=[]; lights=[]; stains=[]; door_edges_bp=[]; wall_segs_bp=[]
 def add_inst(part,x,z,rot=0.0,y=Y0,scale=(1,1,1),col=None):
     instances.append({"part":part,"pos":[round(x,3),round(y,3),round(z,3)],
                       "rot":round(rot,2),"scale":[round(s,4) for s in scale],"col":col})
 
+# ZEMIN + TAVAN + LAMBA + ISIK
 for i in range(NR):
     for j in range(NC):
         r=rid(i,j)
         if r is None: continue
         x,z=cell_center(i,j)
-        add_inst(floor_of(r),x,z,0.0,y=Y0,col=[4,0.12,4,0.0])
-        add_inst("Tavan2",x,z,0.0,y=Y0+WALL_H)
-        add_inst("EndustriyelLamba",x,z,90.0 if (i+j)%2 else 0.0,y=Y0+WALL_H-0.28)
-        if i%2==0 and j%2==0:
-            col_,en_,rng_=TEMA[theme_of(r)][3]
-            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*1.7,"range":rng_*1.15})
+        add_inst(FLOOR_TEX[ODA[r][1]], x,z,0.0,y=Y0,col=[4,0.12,4,0.0])
+        add_inst("Tavan2", x,z,0.0,y=Y0+WALL_H)
+        add_inst("EndustriyelLamba", x,z,90.0 if (i+j)%2 else 0.0,y=Y0+WALL_H-0.28)
+        if (i+j)%2==0:
+            col_,en_,rng_=ISIK[ODA[r][3]]
+            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*1.25,"range":rng_})
 
-WALK={"koridor","salon"}
-_ind=set(r for r in TEMA_OF if theme_of(r) in("bakim","kazan","yaratik","arsiv","islak","lab"))
+# DUVAR + KAPI (kenar bazli; KAPI_SET ciftlerinde kapi)
+_ind=set(r for r in TEMA_OF if TEMA_OF[r] in ("bakim","kazan","yaratik","arsiv","islak","lab","morg"))
 def wall_part_for(a,b): return "Duvar2" if ({a,b}&_ind) else "Duvar"
-duvar_edges=[]; aday={}; oda_aday=defaultdict(list)
-def _tip(r): return "koridor" if r=='c' else TIP.get(r)
-def _kenar(kind,i,j,a,b):
-    if a==b: return
-    if a is None and b is None: return
-    if a is None or b is None: duvar_edges.append((kind,i,j,a,b)); return
-    ta,tb=_tip(a),_tip(b)
-    if ta in WALK and tb in WALK: return
-    if ta=="oda" and tb=="oda": duvar_edges.append((kind,i,j,a,b)); return
-    oda=a if ta=="oda" else b
-    grup=('V',j) if kind=='V' else ('H',i); sira=i if kind=='V' else j
-    aday[(kind,i,j)]=(a,b); oda_aday[oda].append((kind,i,j,grup,sira))
-for i in range(NR):
-    for j in range(NC+1): _kenar('V',i,j,rid(i,j-1),rid(i,j))
-for i in range(NR+1):
-    for j in range(NC): _kenar('H',i,j,rid(i-1,j),rid(i,j))
-kapi_edges=set()
-for oda,ad in oda_aday.items():
-    gr=defaultdict(list)
-    for e in ad: gr[e[3]].append(e)
-    sr=sorted(gr.values(),key=lambda g:-len(g))
-    nk=2 if (len(_hc[oda])>=55 and len(sr)>=2) else 1
-    for g in sr[:nk]:
-        g2=sorted(g,key=lambda e:e[4]); mid=g2[len(g2)//2]; kapi_edges.add((mid[0],mid[1],mid[2]))
+def edge_door(a,b): return (a is not None and b is not None and tuple(sorted((a,b))) in KAPI_SET)
 def edge_geom(kind,i,j): return (j*CELL-2,i*CELL,90.0) if kind=='V' else (j*CELL,i*CELL-2,0.0)
 def seg_bp(kind,x,z): return (x,z-2,x,z+2) if kind=='V' else (x-2,z,x+2,z)
-def place_wall(x,z,rot,part): add_inst(part,x,z,rot,y=Y0,col=[4,3,0.2,1.5])
+def place_wall(x,z,rot,part): add_inst(part,x,z,rot,y=Y0,col=[4,3,0.2,1.5]); wall_segs_bp.append(seg_bp('V' if abs(rot-90)<1 else 'H',x,z))
 def place_door(x,z,rot,part):
     add_inst("Kapi",x,z,rot,y=Y0)
     off=DOOR_W/2+FILL_W/2; sx=FILL_W/CELL; lnt_sx=DOOR_W/CELL; lnt_sy=1.0/WALL_H
@@ -211,135 +153,140 @@ def place_door(x,z,rot,part):
         add_inst(part,x+off,z,rot,y=Y0,scale=(sx,1,1),col=[4,3,0.2,1.5])
         add_inst(part,x-off,z,rot,y=Y0,scale=(sx,1,1),col=[4,3,0.2,1.5])
     add_inst(part,x,z,rot,y=Y0+2.0,scale=(lnt_sx,lnt_sy,1),col=[4,3,0.2,1.5])
-for (kind,i,j) in list(aday.keys()):
-    a,b=aday[(kind,i,j)]; x,z,rot=edge_geom(kind,i,j); part=wall_part_for(a,b)
-    if (kind,i,j) in kapi_edges: place_door(x,z,rot,part); door_edges_bp.append((x,z,kind=='H'))
-    else: place_wall(x,z,rot,part); wall_segs_bp.append(seg_bp(kind,x,z))
-for (kind,i,j,a,b) in duvar_edges:
-    x,z,rot=edge_geom(kind,i,j); part=wall_part_for(a,b)
-    place_wall(x,z,rot,part); wall_segs_bp.append(seg_bp(kind,x,z))
+for i in range(NR):
+    for j in range(NC+1):
+        L,R=rid(i,j-1),rid(i,j)
+        if L==R and L is not None: continue
+        if L is None and R is None: continue
+        x,z,rot=edge_geom('V',i,j); part=wall_part_for(L,R)
+        if edge_door(L,R): place_door(x,z,rot,part); door_edges_bp.append((x,z,False))
+        else: place_wall(x,z,rot,part)
+for i in range(NR+1):
+    for j in range(NC):
+        T,B=rid(i-1,j),rid(i,j)
+        if T==B and T is not None: continue
+        if T is None and B is None: continue
+        x,z,rot=edge_geom('H',i,j); part=wall_part_for(T,B)
+        if edge_door(T,B): place_door(x,z,rot,part); door_edges_bp.append((x,z,True))
+        else: place_wall(x,z,rot,part)
 
-# OBJELER (tema bazli, ROOM hucrelerine - void'e tasmaz)
+# OBJELER (tema bazli)
 OBJELER=[]
-def _o(part,i,j,rot,scale=None): OBJELER.append((part,(i,j),rot)+((scale,) if scale else ()))
-def _anchors(cells):
-    s=sorted(cells); n=len(s)
-    return {"tl":s[0],"br":s[-1],"mid":s[n//2],"q1":s[n//4],"q3":s[(3*n)//4]}
-def themed(th,cells):
-    a=_anchors(cells)
-    if th in("lobi","salon"):
-        for key,part in [("tl","Sutun1"),("br","Sutun2"),("q1","Sutun3"),("q3","Sutun1")]:
-            i,j=a[key]; _o(part,i,j,0,(1.3,2.85,1.3))
-        i,j=a["mid"]; _o("GuvenlikKamerasi",i,j,135)
-    elif th=="ofis":
-        i,j=a["tl"]; _o("ElektrikPanosu",i,j,180); i,j=a["br"]; _o("CopKutusu",i,j,0)
-    elif th=="depo":
-        i,j=a["tl"]; _o("CopKutusu",i,j,0); i,j=a["br"]; _o("CopKutusu",i,j,0); i,j=a["mid"]; _o("ElektrikPanosu",i,j,90)
+def _o(part,i,j,dx,dz,rot,scale=None): OBJELER.append((part,(i,j),(dx,dz),rot)+((scale,) if scale else ()))
+def themed(r):
+    th=TEMA_OF[r]; i0,i1,j0,j1=_bb(r); cI,cJ=(i0+i1)//2,(j0+j1)//2
+    hi=(i1-i0)>=3; wi=(j1-j0)>=3
+    if th=="koridor":
+        cs=_hc[r]; _o("GuvenlikKamerasi",cs[0][0],cs[0][1],0,0,90); _o("GuvenlikKamerasi",cs[-1][0],cs[-1][1],0,0,270)
+        for k in range(3,len(cs),6): _o("Mazgal",cs[k][0],cs[k][1],0,0,0); return
+    if th in ("lobi",):
+        if hi and wi:
+            for s,(ci,cj) in zip(["Sutun1","Sutun2","Sutun3","Sutun1"],[(i0+1,j0+1),(i0+1,j1-1),(i1-1,j0+1),(i1-1,j1-1)]):
+                _o(s,ci,cj,0,0,0,(1.3,2.85,1.3))
+        _o("GuvenlikKamerasi",i0,j0,1.4,-1.4,135); _o("CopKutusu",i1,cJ,0.6,0.8,0)
+    elif th in ("ofis",):
+        _o("ElektrikPanosu",i0,j1,1.4,0,270); _o("CopKutusu",i0+1,j0+1,0,0,0); _o("CopKutusu",i1,j1,0,0,0)
     elif th=="arsiv":
-        i,j=a["tl"]; _o("ElektrikPanosu",i,j,270); i,j=a["mid"]; _o("CopKutusu",i,j,0)
+        _o("ElektrikPanosu",i0,j0,1.4,0,270); _o("CopKutusu",i1,j1,0,0,0); _o("CopKutusu",cI,j0,1.0,0,0)
     elif th=="bakim":
-        i,j=a["tl"]; _o("ElektrikPanosu",i,j,180); i,j=a["q1"]; _o("ElektrikPanosu",i,j,180); i,j=a["mid"]; _o("Mazgal",i,j,0)
+        _o("ElektrikPanosu",i0,j0,0,-1.4,180); _o("ElektrikPanosu",i0,min(j0+2,j1),0,-1.4,180); _o("Mazgal",cI,cJ,0,0,0); _o("CopKutusu",i1,j1,0,0,0)
     elif th=="kazan":
-        i,j=a["tl"]; _o("ElektrikPanosu",i,j,90); i,j=a["mid"]; _o("Mazgal",i,j,0); i,j=a["br"]; _o("Mazgal",i,j,0)
-    elif th=="lab":
-        i,j=a["tl"]; _o("ElektrikPanosu",i,j,180); i,j=a["mid"]; _o("GuvenlikKamerasi",i,j,200)
-    elif th=="wc":
-        i,j=a["mid"]; _o("CopKutusu",i,j,0)
+        _o("ElektrikPanosu",i1,j0,-1.4,0,90); _o("ElektrikPanosu",i1,j1,1.4,0,270); _o("Mazgal",cI,cJ,0,0,0)
+    elif th=="toplanti":
+        _o("CopKutusu",i0,j0,0,0,0); _o("CopKutusu",i1,j1,0,0,0); _o("GuvenlikKamerasi",i0,j1,-1.4,-1.4,225)
     elif th=="islak":
-        i,j=a["tl"]; _o("Mazgal",i,j,0); i,j=a["br"]; _o("Mazgal",i,j,0)
+        for k,(ci,cj) in enumerate(_hc[r]):
+            if k%3==0: _o("Mazgal",ci,cj,0,0,0)
+    elif th=="otopark":
+        _o("GuvenlikKamerasi",i0,j0,1.4,-1.4,135); _o("CopKutusu",i1,j0+1,0,0,0); _o("CopKutusu",i1,j1-1,0,0,0); _o("Mazgal",cI,cJ,0,0,0)
+    elif th=="lab":
+        _o("ElektrikPanosu",i0,j0,0,-1.4,180); _o("GuvenlikKamerasi",i0,j1,-1.4,-1.4,225); _o("CopKutusu",i1,j0,0,0,0)
+    elif th=="morg":
+        for (ci,cj) in [(i0,j0),(i1,j1),(cI,cJ)]: _o("Mazgal",ci,cj,0,0,0)
+        _o("GuvenlikKamerasi",i0,j0,1.4,-1.4,120)
     elif th=="yaratik":
-        for key in ("tl","br","q1","q3","mid"):
-            i,j=a[key]; _o("Mazgal",i,j,0)
-        i,j=a["tl"]; _o("GuvenlikKamerasi",i,j,120)
+        _o("Canavar",i1-1,cJ,0,0,200)
+        for (ci,cj) in [(i0,j0+1),(i0,j1-1),(cI,j0),(cI,j1)]: _o("Mazgal",ci,cj,0,0,0)
+        _o("GuvenlikKamerasi",i0,j0,1.4,-1.4,120); _o("CopKutusu",i1,j0,0,0,0)
     elif th=="cikis":
-        i,j=a["mid"]; _o("GuvenlikKamerasi",i,j,250)
-for r in ODA: themed(theme_of(r),_hc[r])
-if creature_cell: _o("Canavar",creature_cell[0],creature_cell[1],200)
-cor=[(i,j) for i in range(NR) for j in range(NC) if GRID[i][j]=='c']
-for k in range(0,len(cor),21): _o("Mazgal",cor[k][0],cor[k][1],0)
-
+        _o("GuvenlikKamerasi",i0,j1,-1.4,-1.4,250)
+for r in ODA: themed(r)
 for o in OBJELER:
-    part,(i,j),rot=o[0],o[1],o[2]; scl=tuple(o[3]) if len(o)>3 else (1,1,1)
+    part,(i,j),(dx,dz),rot=o[0],o[1],o[2],o[3]
+    scl=tuple(o[4]) if len(o)>4 else (1,1,1)
     x,z=cell_center(i,j); meta=PARTS[part]; y=Y0
     if part=="GuvenlikKamerasi": y=Y0+WALL_H-1.0
     col=None
     if meta.get("col"): cs=meta["col"]; col=[cs[0],cs[1],cs[2],cs[1]/2.0]
-    add_inst(part,x,z,float(rot),y=y,scale=scl,col=col)
+    add_inst(part,x+dx,z+dz,float(rot),y=y,scale=scl,col=col)
 
+# LEKE (desenli: duvar dipleri)
+random.seed(7)
+floor_cells=[(i,j) for i in range(NR) for j in range(NC) if rid(i,j)]
 for idx,(x0,z0,x1,z1) in enumerate(wall_segs_bp):
     if idx%2: continue
     mx,mz=(x0+x1)/2.0,(z0+z1)/2.0
     stains.append({"pos":[round(mx,2),Y0+0.07,round(mz,2)],"normal":[0,1,0],
                    "size":round(0.6+(idx%5)*0.18,2),"tex":"lekeler/leke_%02d"%((idx%16)+1),"rot":float((idx*47)%360)})
-for r in ODA:
-    i0,i1,j0,j1=_rect[r]; cx,cz=cell_center((i0+i1)//2,(j0+j1)//2)
-    stains.append({"pos":[round(cx,2),Y0+0.07,round(cz,2)],"normal":[0,1,0],
-                   "size":1.1,"tex":"lekeler/leke_%02d"%((abs(hash(r))%16)+1),"rot":float(abs(hash(r))%360)})
 
-if spawn_cell is None: spawn_cell=cor[0] if cor else (2,2)
-sx,sz=cell_center(*spawn_cell); spawn=[sx,Y0+1.0,sz]
+# SPAWN (A Resepsiyon ortasi)
+sx,sz=cell_center(3,5); spawn=[sx,Y0+1.0,sz]
 
 plan={"cell":CELL,"wall_h":WALL_H,"y0":Y0,"nr":NR,"nc":NC,"parts_meta":PARTS,
       "instances":instances,"lights":lights,"stains":stains,"spawn":spawn,
-      "grid":["".join(r) for r in GRID],"rooms":{r:[name_of(r),floor_of(r)] for r in ODA}}
+      "grid":["".join(r) for r in GRID],"rooms":{r:[ODA[r][0],ODA[r][1]] for r in ODA}}
 with open(os.path.join(OUT,"dunya_plan.json"),"w") as f: json.dump(plan,f,indent=1)
-# baglilik
-def _wk(i,j):
-    if not(0<=i<H and 0<=j<W): return False
-    g=GRID[i][j]; return g=='c' or (g!='.' and TIP.get(g)=="salon")
-st=next(((i,j) for i in range(H) for j in range(W) if GRID[i][j]=='c'),None)
-rset=set()
-if st:
-    rset.add(st); q=deque([st])
-    while q:
-        i,j=q.popleft()
-        for di,dj in((0,1),(0,-1),(1,0),(-1,0)):
-            if _wk(i+di,j+dj) and (i+di,j+dj) not in rset: rset.add((i+di,j+dj)); q.append((i+di,j+dj))
-unreach=[r for r in ODA if not any((i+di,j+dj) in rset for (i,j) in _hc[r] for di,dj in((0,1),(0,-1),(1,0),(-1,0)))]
-print("instances:",len(instances),"lights:",len(lights),"oda:",len(ODA),
-      "kapi:",len(kapi_edges),"koridor tek-parca:", len(rset)==sum(1 for i in range(H) for j in range(W) if _wk(i,j)),
-      "erisilemez:",unreach or "YOK")
+print("instances:",len(instances),"lights:",len(lights),"oda:",len([r for r in ODA if TEMA_OF[r]!='koridor']),
+      "koridor:",len([r for r in ODA if TEMA_OF[r]=='koridor']),"kapi:",sum(1 for _ in door_edges_bp))
 
-# ===================================================== KROKI (okunakli, isimli)
-fig,ax=plt.subplots(figsize=(16,17)); ax.set_facecolor("#f6f4ee")
+# ===================================================== KROKI (50d8415 stili: isimli + lamba noktalari + lejant)
+def room_cells(r): return _hc.get(r,[])
+fig,ax=plt.subplots(figsize=(20,11)); ax.set_facecolor("#f7f5ef")
 for i in range(NR):
     for j in range(NC):
         r=rid(i,j)
         if r is None: continue
         x,z=cell_center(i,j)
-        ax.add_patch(Rectangle((x-2,z-2),CELL,CELL,facecolor=TEMA[theme_of(r)][2],edgecolor="#cfcabd",lw=0.25,zorder=1))
+        ax.add_patch(Rectangle((x-2,z-2),CELL,CELL,facecolor=ODA[r][2],edgecolor="#bcb7a8",lw=0.5,zorder=1))
 for r in ODA:
-    i0,i1,j0,j1=_rect[r]; cx,cz=cell_center((i0+i1)//2,(j0+j1)//2)
-    ax.text(cx,cz,name_of(r),ha="center",va="center",fontsize=6.2,color="#222",zorder=5)
+    cs=room_cells(r)
+    if not cs: continue
+    cx=sum(cell_center(i,j)[0] for i,j in cs)/len(cs); cz=sum(cell_center(i,j)[1] for i,j in cs)/len(cs)
+    ax.text(cx,cz-0.35,ODA[r][0],ha="center",va="center",fontsize=8.5,weight="bold",color="#2b2b2b",zorder=5)
+    ax.text(cx,cz+0.8,"%d m2"%(len(cs)*16),ha="center",va="center",fontsize=6.5,color="#555",zorder=5)
 for x0,z0,x1,z1 in wall_segs_bp:
-    ax.plot([x0,x1],[z0,z1],color="#1c1c1c",lw=2.6,solid_capstyle="butt",zorder=6)
+    ax.plot([x0,x1],[z0,z1],color="#1c1c1c",lw=4,solid_capstyle="butt",zorder=6)
 for x,z,yatay in door_edges_bp:
     if yatay:
-        ax.plot([x-DOOR_W/2,x+DOOR_W/2],[z,z],color="#f6f4ee",lw=3.5,zorder=7)
-        ax.add_patch(Arc((x-DOOR_W/2,z),DOOR_W*2,DOOR_W*2,theta1=0,theta2=80,color="#8a6d3b",lw=0.8,zorder=8))
+        ax.plot([x-DOOR_W/2,x+DOOR_W/2],[z,z],color="#f7f5ef",lw=5,zorder=7)
+        ax.add_patch(Arc((x-DOOR_W/2,z),DOOR_W*2,DOOR_W*2,theta1=0,theta2=80,color="#8a6d3b",lw=1,zorder=8))
     else:
-        ax.plot([x,x],[z-DOOR_W/2,z+DOOR_W/2],color="#f6f4ee",lw=3.5,zorder=7)
-        ax.add_patch(Arc((x,z-DOOR_W/2),DOOR_W*2,DOOR_W*2,theta1=10,theta2=90,color="#8a6d3b",lw=0.8,zorder=8))
-ST={"CopKutusu":("o","#3b7a3b","Cop"),"ElektrikPanosu":("s","#b5651d","Pano"),
-    "GuvenlikKamerasi":("^","#b00020","Kamera"),"Mazgal":("P","#3a3a3a","Mazgal"),
-    "Canavar":("X","#cc0033","CANAVAR"),"Sutun1":("H","#7d828b","Sutun"),
-    "Sutun2":("H","#7d828b","Sutun"),"Sutun3":("H","#7d828b","Sutun")}
+        ax.plot([x,x],[z-DOOR_W/2,z+DOOR_W/2],color="#f7f5ef",lw=5,zorder=7)
+        ax.add_patch(Arc((x,z-DOOR_W/2),DOOR_W*2,DOOR_W*2,theta1=10,theta2=90,color="#8a6d3b",lw=1,zorder=8))
+OBJ_STYLE={"CopKutusu":("o","#3b7a3b","Cop Kutusu"),"ElektrikPanosu":("s","#b5651d","Elektrik Panosu"),
+           "GuvenlikKamerasi":("^","#b00020","Guvenlik Kamerasi"),"Mazgal":("P","#3a3a3a","Mazgal"),
+           "Canavar":("X","#cc0033","CANAVAR"),"Sutun1":("H","#7d828b","Sutun"),
+           "Sutun2":("H","#7d828b","Sutun"),"Sutun3":("H","#7d828b","Sutun")}
 for o in OBJELER:
-    part,(i,j),rot=o[0],o[1],o[2]
-    if part not in ST: continue
-    x,z=cell_center(i,j); m,c,_=ST[part]
-    ax.scatter([x],[z],marker=m,s=(150 if part=="Canavar" else 42),color=c,edgecolor="white",lw=0.5,zorder=9)
-ax.scatter([spawn[0]],[spawn[2]],marker="*",s=240,color="#0050b3",edgecolor="white",lw=1,zorder=10)
-ax.text(spawn[0],spawn[2]-1.6,"BASLANGIC",ha="center",fontsize=9,color="#0050b3",weight="bold",zorder=10)
-ax.set_xlim(-4,NC*CELL); ax.set_ylim(NR*CELL,-4); ax.set_aspect("equal"); ax.axis("off")
-ax.set_title("BACKROOMS 'CIKIS YOK' — ZEMIN KAT\n%d oda | %d m2 | organik koridor agi (acik), odalar kapili, bol baglanti"%(
-    len(ODA), (sum(len(c) for c in _hc.values())+len(cor))*16),fontsize=13,weight="bold")
-leg=[Line2D([0],[0],marker=m,color="w",markerfacecolor=c,markersize=9,label=l) for (m,c,l) in
-     {("^","#b00020","Kamera"),("o","#3b7a3b","Cop"),("s","#b5651d","Pano"),("P","#3a3a3a","Mazgal"),
-      ("X","#cc0033","CANAVAR"),("H","#7d828b","Sutun")}]
-leg.append(Line2D([0],[0],color="#1c1c1c",lw=3,label="Duvar"))
-leg.append(Line2D([0],[0],marker="*",color="w",markerfacecolor="#0050b3",markersize=12,label="Baslangic"))
-ax.legend(handles=leg,loc="upper left",bbox_to_anchor=(1.01,1.0),fontsize=8,frameon=True)
+    part,(i,j),(dx,dz),rot=o[0],o[1],o[2],o[3]
+    if part not in OBJ_STYLE: continue
+    x,z=cell_center(i,j); m,c,lab=OBJ_STYLE[part]
+    ax.scatter([x+dx],[z+dz],marker=m,s=(150 if part=="Canavar" else 80),color=c,edgecolor="white",lw=0.6,zorder=9)
+for i,j in floor_cells:
+    x,z=cell_center(i,j); ax.scatter([x],[z],marker="*",s=22,color="#d4a017",alpha=0.45,zorder=4)
+ax.scatter([spawn[0]],[spawn[2]],marker="X",s=170,color="#0050b3",edgecolor="white",lw=1,zorder=10)
+ax.text(spawn[0],spawn[2]-0.9,"BASLANGIC",ha="center",fontsize=8,color="#0050b3",weight="bold",zorder=10)
+ax.set_xlim(-4,NC*CELL); ax.set_ylim(NR*CELL,-4); ax.set_aspect("equal"); ax.set_xlabel("X (m)"); ax.set_ylabel("Z (m)")
+ax.set_title("BACKROOMS — ZEMIN KAT (2 KANAT: A + Gecit + B)\n%d oda · %d m2 · iki farkli kanat yan yana"%(
+    len([r for r in ODA if TEMA_OF[r]!='koridor']), len(floor_cells)*16), fontsize=14, weight="bold")
+leg=[]
+seen=set()
+for (m,c,lab) in OBJ_STYLE.values():
+    if lab in seen: continue
+    seen.add(lab); leg.append(Line2D([0],[0],marker=m,color="w",markerfacecolor=c,markersize=10,label=lab))
+leg.append(Line2D([0],[0],color="#1c1c1c",lw=4,label="Duvar"))
+leg.append(Line2D([0],[0],marker="X",color="w",markerfacecolor="#0050b3",markersize=11,label="Baslangic"))
+ax.legend(handles=leg,loc="upper left",bbox_to_anchor=(1.005,1.0),fontsize=8,frameon=True)
 plt.tight_layout()
-fig.savefig(os.path.join(OUT,"krokiler","kat_zemin.png"),dpi=110,bbox_inches="tight")
+fig.savefig(os.path.join(OUT,"krokiler","kat_zemin.png"),dpi=120,bbox_inches="tight")
 print("KROKI ->",os.path.join(OUT,"krokiler","kat_zemin.png"))
