@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://k76r7xabyaqg"
 path.s3tc="res://.godot/imported/gray_tile_wall_01_ao.png-a124c600399952fa95adbd8731c4e8cf.s3tc.ctex"
+path.etc2="res://.godot/imported/gray_tile_wall_01_ao.png-a124c600399952fa95adbd8731c4e8cf.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://textures/gray_tile_wall_01_ao.png"
-dest_files=["res://.godot/imported/gray_tile_wall_01_ao.png-a124c600399952fa95adbd8731c4e8cf.s3tc.ctex"]
+dest_files=["res://.godot/imported/gray_tile_wall_01_ao.png-a124c600399952fa95adbd8731c4e8cf.s3tc.ctex", "res://.godot/imported/gray_tile_wall_01_ao.png-a124c600399952fa95adbd8731c4e8cf.etc2.ctex"]
 
 [params]
 

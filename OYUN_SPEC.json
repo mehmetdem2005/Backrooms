@@ -4,12 +4,14 @@
   "surum_spec": "2.0",
   "tarih": "2026-06-10",
   "motor": "Godot 4.6",
-  "hedef_platform": ["Android (APK, mobil)", "PC (masaustu)"],
+  "hedef_platform": [
+   "Android (APK, mobil)",
+   "PC (masaustu)"
+  ],
   "render": "Forward+ (PC) / Mobile (telefon) — ayni proje, export profiline gore",
   "amac": "Atmosferik, optimize, akilli canavarli, hikayeli buyuk Backrooms kacis oyunu",
   "tek_dogruluk_kaynagi": "tools/dunya_uretici/dunya_uret.py -> dunya_plan.json -> insa_dunya.gd -> Dunya.tscn"
  },
-
  "arastirma": {
   "oyun_standartlari": {
    "isik_optimizasyonu": [
@@ -69,7 +71,6 @@
     "Hareket modu -> ayak sesi yaricapi -> canavarin seni duyma mesafesi (ses-tabanli AI baglantisi)."
    ]
   },
-
   "yapay_zeka_arastirma": {
    "navigasyon": [
     "Godot NavigationServer3D + NavigationRegion3D: NavigationMesh haritadan bake edilir; canavar NavigationAgent3D ile engellerin ETRAFINDAN dolanir (duvarlara takilmaz).",
@@ -99,10 +100,12 @@
    ]
   }
  },
-
  "gereksinimler": [
   {
-   "id": 1, "baslik": "Isik optimizasyonu (kasma cozumu)", "oncelik": "kritik", "durum": "yapilacak",
+   "id": 1,
+   "baslik": "Isik optimizasyonu (kasma cozumu)",
+   "oncelik": "kritik",
+   "durum": "yapilacak",
    "kaynak_promt": "bu kadar fazla isik oyunun kasasina sebep oluyor isik optimasyonu yapman gerekiyor",
    "yaklasim": "62 gercek zamanli OmniLight -> LightmapGI bake + distance_fade + chunk ile devre disi; ekranda <16 aktif isik.",
    "gorevler": [
@@ -112,10 +115,17 @@
     "Chunk pasifken o chunk'in isiklarini kapat."
    ],
    "kabul_kriteri": "Mobil profilde 10x haritada >=30 FPS; ekranda aktif gercek zamanli isik <=16.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "tools/dunya_uretici/insa_dunya.gd", "Dunya.tscn"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py",
+    "tools/dunya_uretici/insa_dunya.gd",
+    "Dunya.tscn"
+   ]
   },
   {
-   "id": 2, "baslik": "Chunk (parca) yukleme sistemi", "oncelik": "kritik", "durum": "yapilacak",
+   "id": 2,
+   "baslik": "Chunk (parca) yukleme sistemi",
+   "oncelik": "kritik",
+   "durum": "yapilacak",
    "kaynak_promt": "chunk sistemi kurman gerekiyor",
    "yaklasim": "Odalari 3x3 hucre chunklara grupla; oyuncu hucresine gore aktif/pasif (gorunur+isik+fizik).",
    "gorevler": [
@@ -125,10 +135,17 @@
     "OccluderInstance3D ile duvar arkasi okluzyon."
    ],
    "kabul_kriteri": "Ayni anda en fazla ~9 chunk aktif; uzak chunklar GPU/fizikten dusuk.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "addons/chunk/ChunkYonetici.gd (yeni)", "Dunya.tscn"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py",
+    "addons/chunk/ChunkYonetici.gd (yeni)",
+    "Dunya.tscn"
+   ]
   },
   {
-   "id": 3, "baslik": "Gelismis ses sistemi", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 3,
+   "baslik": "Gelismis ses sistemi",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "gelismis ses sistemi kurman gerekiyor",
    "yaklasim": "3B konumlu ses + audio bus mimarisi + bolge ambiyansi + dinamik gerilim muzigi + zemin/mod bazli ayak sesi.",
    "gorevler": [
@@ -139,10 +156,18 @@
     "Ayak sesi: zemin tipi + hareket modu -> ses + duyulma yaricapi."
    ],
    "kabul_kriteri": "Bolge degisince ambiyans degisir; canavar yaklasinca ses artar; ayak sesi moda gore degisir.",
-   "dosyalar": ["addons/ses/SesYonetici.gd (yeni)", "audio/ (yeni ses dosyalari)", "oyuncu.gd", "parts/canavar.gd"]
+   "dosyalar": [
+    "addons/ses/SesYonetici.gd (yeni)",
+    "audio/ (yeni ses dosyalari)",
+    "oyuncu.gd",
+    "parts/canavar.gd"
+   ]
   },
   {
-   "id": 4, "baslik": "Gelismis canavar kovalama animasyonu", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 4,
+   "baslik": "Gelismis canavar kovalama animasyonu",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "gelismis canavar kovalama animasyonu kurman gerekiyor",
    "yaklasim": "AnimationTree StateMachine: idle/walk/run/lunge/scream; hiza gore blend, koda senkron.",
    "gorevler": [
@@ -152,10 +177,16 @@
     "Saldiri menzilinde lunge animasyonu."
    ],
    "kabul_kriteri": "Canavar yururken/kosarken ayak kaymaz; durum gecisleri yumusak.",
-   "dosyalar": ["parts/Canavar.tscn", "parts/canavar.gd"]
+   "dosyalar": [
+    "parts/Canavar.tscn",
+    "parts/canavar.gd"
+   ]
   },
   {
-   "id": 5, "baslik": "Moduler duvar/zemin (0.5 scale, 2 kat ust uste)", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 5,
+   "baslik": "Moduler duvar/zemin (0.5 scale, 2 kat ust uste)",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "duvarlari tek kullanma, duvar buyuklugunu 0.5 scale yap ve 2 duvar ust uste koy zemini de ayni sekilde",
    "yaklasim": "Tek 4x3 duvar yerine 0.5 scale parcalardan 2 kat (alt+ust) dosenmis duvar; zemin de 0.5 karelerle 2 katman/grid.",
    "gorevler": [
@@ -164,10 +195,16 @@
     "Varyantlari (Duvar/Duvar2/irili) desenli dagit."
    ],
    "kabul_kriteri": "Duvarlar tek dev parca degil; gorsel detay/tekrar kirilmasi artar; carpisma butun kalir.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "tools/dunya_uretici/insa_dunya.gd"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py",
+    "tools/dunya_uretici/insa_dunya.gd"
+   ]
   },
   {
-   "id": 6, "baslik": "Kapi pervaz/kenar duvarlari kapiya uysun", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 6,
+   "baslik": "Kapi pervaz/kenar duvarlari kapiya uysun",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "kapilarin kenarlarindaki duvarlar kapinin sekline uymuyor onu duzelt",
    "yaklasim": "Kapi kanat genisligi/yuksekligi ile yan dolgu (jamb) ve ust lento olculerini birebir eslestir; bosluk/tasma olmasin.",
    "gorevler": [
@@ -176,10 +213,15 @@
     "Render+oyun icinde dogrula (bosluk/cakisma yok)."
    ],
    "kabul_kriteri": "Kapi cercevesi etrafinda bosluk veya tasan duvar yok; lento kapi ustunu tam kapatir.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 7, "baslik": "Mobil kontroller", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 7,
+   "baslik": "Mobil kontroller",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "mobil kontroller",
    "yaklasim": "Dokunmatik: sol analog (hareket), sag ekran (bakis), butonlar (kosu/egilme/fener/etkilesim). CanvasLayer UI.",
    "gorevler": [
@@ -189,10 +231,17 @@
     "PC'de gizli, mobilde gorunur (OS.has_feature)."
    ],
    "kabul_kriteri": "Telefonda parmakla gezilebilir, bakilabilir, kosu/egilme/fener calisir.",
-   "dosyalar": ["arayuz/MobilKontrol.tscn (yeni)", "oyuncu.gd", "project.godot (input)"]
+   "dosyalar": [
+    "arayuz/MobilKontrol.tscn (yeni)",
+    "oyuncu.gd",
+    "project.godot (input)"
+   ]
   },
   {
-   "id": 8, "baslik": "Havali fener + pil sistemi", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 8,
+   "baslik": "Havali fener + pil sistemi",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "elimizde havali bir fener yok ... fener pilleri olmali bazi yerlerde",
    "yaklasim": "SpotLight3D fener: titreme, pil azalinca renk/parlaklik dusus, sonme; pil pickup'lari desenli yerlestirme.",
    "gorevler": [
@@ -202,10 +251,17 @@
     "Havali: hafif flicker, sicak->soguk renk, koni volumetrik (mobil hafif)."
    ],
    "kabul_kriteri": "Fener acilir/kapanir, pil azalir, pil toplanir; gorsel olarak 'havali'.",
-   "dosyalar": ["oyuncu.gd", "parts/Pil.tscn (yeni)", "tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "oyuncu.gd",
+    "parts/Pil.tscn (yeni)",
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 9, "baslik": "Sahte lambalar (isik paylasimi)", "oncelik": "orta", "durum": "yapilacak",
+   "id": 9,
+   "baslik": "Sahte lambalar (isik paylasimi)",
+   "oncelik": "orta",
+   "durum": "yapilacak",
    "kaynak_promt": "bazi lambalar sahte olmali baska isigin lambasiyla beraber kullanilmali",
    "yaklasim": "Bazi tavan lambasi mesh+emissive ama OmniLight yok; yanindaki gercek isigi gorsel olarak paylasir -> isik sayisi duser.",
    "gorevler": [
@@ -213,10 +269,15 @@
     "Sahte lamba emissive ile yanik gorunur."
    ],
    "kabul_kriteri": "Lamba sayisi ayni gorunur ama gercek isik sayisi ~yariya iner.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 10, "baslik": "Acilip kapanan/titreyen isiklar", "oncelik": "orta", "durum": "yapilacak",
+   "id": 10,
+   "baslik": "Acilip kapanan/titreyen isiklar",
+   "oncelik": "orta",
+   "durum": "yapilacak",
    "kaynak_promt": "bazi isiklar acilip kapanir olmali",
    "yaklasim": "Bazi isiklara flicker/timer scripti: bozuk floresan; rastgele aralikla soner-yanar.",
    "gorevler": [
@@ -224,10 +285,16 @@
     "insa: flicker isiklara TitreyenIsik.gd ekle (noise/timer ile energy modulasyonu)."
    ],
    "kabul_kriteri": "Belli isiklar bozuk floresan gibi titrer/soner; korku atmosferi.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "addons/isik/TitreyenIsik.gd (yeni)"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py",
+    "addons/isik/TitreyenIsik.gd (yeni)"
+   ]
   },
   {
-   "id": 11, "baslik": "Isik sizmasi (duvar arkasina tasma) duzeltme", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 11,
+   "baslik": "Isik sizmasi (duvar arkasina tasma) duzeltme",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "bazi isiklar diger odalara tasiyor arada duvar olmasina ragmen",
    "yaklasim": "omni_range'i oda yari-genisligine sigacak sekilde kis; bake sonrasi sizinti yok; gerekirse isigi oda merkezine hizala.",
    "gorevler": [
@@ -236,10 +303,16 @@
     "Dogrula: kapali odada yan oda isigi gorunmuyor."
    ],
    "kabul_kriteri": "Arada duvar olan odaya isik tasmaz.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "insa_dunya.gd"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py",
+    "insa_dunya.gd"
+   ]
   },
   {
-   "id": 12, "baslik": "Daha cok kir/leke + irili duvar ve fayans", "oncelik": "orta", "durum": "yapilacak",
+   "id": 12,
+   "baslik": "Daha cok kir/leke + irili duvar ve fayans",
+   "oncelik": "orta",
+   "durum": "yapilacak",
    "kaynak_promt": "daha cok kirle boya ve zaten irili olan duvar ve fayanslari kullan",
    "yaklasim": "Leke sayisini artir + DESENLI dagit (kose/sizinti/trafik); irili (yuksek detayli/buyuk desenli) duvar2 ve fayans varyantlarini agirlikli kullan.",
    "gorevler": [
@@ -248,10 +321,15 @@
     "Duvar diplerine/koselere ekstra kir."
    ],
    "kabul_kriteri": "Yuzeyler belirgin kirli/yipranmis; irili dokular baskin.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 13, "baslik": "Haritayi 10 kata cikar (havali, geometrik olmayan)", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 13,
+   "baslik": "Haritayi 10 kata cikar (havali, geometrik olmayan)",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "haritayi 10 katina kadar cikart ama gene dusunerek havali geometrik olmayan bir harita yap",
    "yaklasim": "Alan ~10x; izgara hissi YOK: asimetrik odalar, cikmazlar, donen koridorlar, landmark'lar; akis+coklu yol+kesisme rotalari korunur.",
    "gorevler": [
@@ -261,10 +339,15 @@
     "Canavar kesisme rotalari icin coklu baglanti."
    ],
    "kabul_kriteri": "Alan ~10x; harita duzenli kafes gibi degil, kesfedilesi/kaybolunasi ama gecilebilir.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 14, "baslik": "Akilli canavar AI (engel etrafindan dolanma)", "oncelik": "kritik", "durum": "yapilacak",
+   "id": 14,
+   "baslik": "Akilli canavar AI (engel etrafindan dolanma)",
+   "oncelik": "kritik",
+   "durum": "yapilacak",
    "kaynak_promt": "daha akilli ve engellerin etrafindan dolanan bir canavar yapay zekasi",
    "yaklasim": "NavigationServer3D + NavigationAgent3D ile gercek yol bulma; duvarlara takilmaz, engelden dolanir.",
    "gorevler": [
@@ -273,10 +356,17 @@
     "Path ~0.3s'de bir guncellenir (perf)."
    ],
    "kabul_kriteri": "Canavar duvar/engel etrafindan akici sekilde dolanir, takilmaz.",
-   "dosyalar": ["parts/canavar.gd", "Dunya.tscn (NavigationRegion3D)", "insa_dunya.gd"]
+   "dosyalar": [
+    "parts/canavar.gd",
+    "Dunya.tscn (NavigationRegion3D)",
+    "insa_dunya.gd"
+   ]
   },
   {
-   "id": 15, "baslik": "Daha tedirgin edici canavar", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 15,
+   "baslik": "Daha tedirgin edici canavar",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "daha tedirgin edici bir canavar yap",
    "yaklasim": "Stalking (hemen oldurmez, izler), ongorulemez davranis, ses ipuclari, ani yon degistirme, oyuncuya bakma.",
    "gorevler": [
@@ -285,10 +375,16 @@
     "Ani bas cevirme/durma (utility)."
    ],
    "kabul_kriteri": "Canavar tahmin edilemez ve psikolojik baski yaratir.",
-   "dosyalar": ["parts/canavar.gd", "addons/ses/SesYonetici.gd"]
+   "dosyalar": [
+    "parts/canavar.gd",
+    "addons/ses/SesYonetici.gd"
+   ]
   },
   {
-   "id": 16, "baslik": "Kesisme/onunu kesme AI (dengeli flanking)", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 16,
+   "baslik": "Kesisme/onunu kesme AI (dengeli flanking)",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "bazen bizi kovalamayi birakip baska yoldan onumuzu kesmeye calissin ama dengesi olsun",
    "yaklasim": "Oyuncunun gidecegi dugumu tahmin et, alternatif yoldan kesme; cooldown+kosul ile adil (surekli degil).",
    "gorevler": [
@@ -297,10 +393,15 @@
     "Fairness: sadece (uzun gorus + avantaj) + cooldown; oyuncuya kacis penceresi."
    ],
    "kabul_kriteri": "Canavar bazen onunu keser ama bunaltmaz; oyuncunun kacma sansi kalir.",
-   "dosyalar": ["parts/canavar.gd"]
+   "dosyalar": [
+    "parts/canavar.gd"
+   ]
   },
   {
-   "id": 17, "baslik": "Oyuncu hareket: sessiz/egilme/kosu + stamina", "oncelik": "yuksek", "durum": "yapilacak",
+   "id": 17,
+   "baslik": "Oyuncu hareket: sessiz/egilme/kosu + stamina",
+   "oncelik": "yuksek",
+   "durum": "yapilacak",
    "kaynak_promt": "nasil sessiz yurume egilme hizli yurume stamina var vs de olmali",
    "yaklasim": "Hareket modlari: normal/sprint(stamina)/crouch(sessiz+yavas)/sessiz; her mod ses yaricapi -> AI duyma.",
    "gorevler": [
@@ -310,10 +411,17 @@
     "Mod -> ayak sesi yaricapi -> canavar perception baglantisi."
    ],
    "kabul_kriteri": "4 hareket modu calisir; stamina bar; egilince/sessizken canavar gec duyar.",
-   "dosyalar": ["oyuncu.gd", "arayuz/HUD.tscn (stamina/pil)", "project.godot (input)"]
+   "dosyalar": [
+    "oyuncu.gd",
+    "arayuz/HUD.tscn (stamina/pil)",
+    "project.godot (input)"
+   ]
   },
   {
-   "id": 18, "baslik": "Assetleri rastgele degil DESENLI dagit", "oncelik": "orta", "durum": "yapilacak",
+   "id": 18,
+   "baslik": "Assetleri rastgele degil DESENLI dagit",
+   "oncelik": "orta",
+   "durum": "yapilacak",
    "kaynak_promt": "assestleru rastgele dagitma",
    "yaklasim": "Tum obje/leke/pil/isik yerlesimi TASARLANMIS (elle/kurallı) olsun; random.choice ile sacma yok.",
    "gorevler": [
@@ -322,31 +430,51 @@
     "Rastgele seed'e bagimliligi kaldir veya kontrollu desene cevir."
    ],
    "kabul_kriteri": "Yerlesim dusunulmus gorunur; rastgele sacilmis his yok.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 19, "baslik": "Gelismis oyun standartlari arastirmasi", "oncelik": "bilgi", "durum": "tamamlandi",
+   "id": 19,
+   "baslik": "Gelismis oyun standartlari arastirmasi",
+   "oncelik": "bilgi",
+   "durum": "tamamlandi",
    "kaynak_promt": "gelismis oyun standartlarinda arastir",
    "yaklasim": "Bu spec'in 'arastirma.oyun_standartlari' bolumune islendi (isik bake/cull, chunk/okluzyon, audio bus/3B ses, animasyon tree, modulerlik).",
    "kabul_kriteri": "Her sistem icin uygulanabilir standart yontem belgelendi.",
-   "dosyalar": ["OYUN_SPEC.json (arastirma)"]
+   "dosyalar": [
+    "OYUN_SPEC.json (arastirma)"
+   ]
   },
   {
-   "id": 20, "baslik": "Gelismis yapay zeka arastirmasi", "oncelik": "bilgi", "durum": "tamamlandi",
+   "id": 20,
+   "baslik": "Gelismis yapay zeka arastirmasi",
+   "oncelik": "bilgi",
+   "durum": "tamamlandi",
    "kaynak_promt": "gelismis yapay zeka nasil yapilir onuda arastir",
    "yaklasim": "'arastirma.yapay_zeka_arastirma' bolumune islendi (NavMesh, HSM/utility, perception, flanking, F.E.A.R./Alien Isolation referanslari).",
    "kabul_kriteri": "Uygulanabilir AI mimarisi + referanslar belgelendi.",
-   "dosyalar": ["OYUN_SPEC.json (arastirma)"]
+   "dosyalar": [
+    "OYUN_SPEC.json (arastirma)"
+   ]
   },
   {
-   "id": 21, "baslik": "Bu promtu JSON'a tek tek dok (atlanmadan)", "oncelik": "kritik", "durum": "tamamlandi",
+   "id": 21,
+   "baslik": "Bu promtu JSON'a tek tek dok (atlanmadan)",
+   "oncelik": "kritik",
+   "durum": "tamamlandi",
    "kaynak_promt": "bu tum promtumu JSON formatinda tek tek hazirla hicbirseyi atlamadigindsn emin ol",
    "yaklasim": "Bu dosya (OYUN_SPEC.json) — 23 maddenin tamami 'gereksinimler' dizisinde, her birinde kaynak_promt alintisi.",
    "kabul_kriteri": "Promttaki her istek bir gereksinim id'sine eslesir.",
-   "dosyalar": ["OYUN_SPEC.json"]
+   "dosyalar": [
+    "OYUN_SPEC.json"
+   ]
   },
   {
-   "id": 22, "baslik": "APK uret ve teslim et", "oncelik": "kritik", "durum": "yapilacak (en son)",
+   "id": 22,
+   "baslik": "APK uret ve teslim et",
+   "oncelik": "kritik",
+   "durum": "tamamlandi",
    "kaynak_promt": "en son apk yap bana ver",
    "yaklasim": "Tum sistemler uygulandiktan sonra Godot Android export ile imzali APK; indirme linki.",
    "gorevler": [
@@ -356,17 +484,28 @@
     "APK'yi indirme linkiyle teslim."
    ],
    "kabul_kriteri": "Telefona kurulup acilan, oynanabilir imzali APK + indirme linki.",
-   "dosyalar": ["export_presets.cfg (yeni)", "dist/Backrooms.apk (cikti)"]
+   "dosyalar": [
+    "export_presets.cfg (yeni)",
+    "dist/Backrooms.apk (cikti)"
+   ]
   },
   {
-   "id": 23, "baslik": "Hikaye/akis korunsun (mevcut 'Cikis Yok')", "oncelik": "orta", "durum": "devam",
+   "id": 23,
+   "baslik": "Hikaye/akis korunsun (mevcut 'Cikis Yok')",
+   "oncelik": "orta",
+   "durum": "devam",
    "kaynak_promt": "(onceki) hikayeli ve dusunulmus harita — 10x buyutmede korunmali",
    "yaklasim": "Resepsiyon->koridor->kesif->bakim->islak->yaratik ini->cikis akisi 10x haritada bolgesel atmosferle korunur.",
    "kabul_kriteri": "Buyuk haritada baslangic->cikis anlatisi ve atmosfer gecisi anlasilir.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 24, "baslik": "Acilis sinematigi (canavar bizi serbest birakir, 10'a sayar)", "oncelik": "yuksek", "durum": "yapilacak (Faz 4)",
+   "id": 24,
+   "baslik": "Acilis sinematigi (canavar bizi serbest birakir, 10'a sayar)",
+   "oncelik": "yuksek",
+   "durum": "yapilacak (Faz 4)",
    "kaynak_promt": "en basta biz bayginken goz acilip kapanma efekti ekle uyanir gibi, canavar basimizda bekliyor korkmamiz ona zevk verdigi icin bizi uyanik avlamak istiyor, uyaniyoruz canavar bizi tutmus korkunc bir ses tonuyla bagirarak serbest birakiyor kacmamizi soyleyecek iyi bir replik korkunc sesle uyumlu, 10 saniye sayacagini soyluyor birakiyor 10'a kadar sayiyor rahatsiz edici ses tonu, sinematik animasyonla baslayacagiz, canavara da animasyon yap bunlari soylerken uygun olsun",
    "yaklasim": "Oyun acilisinda kontrol kapali sinematik: (1) siyah ekran + goz acilip kapanma (kirpma) efekti -> oyuncu ayiliyor; (2) kamera yukari kalkar, canavar yuzune cok yakin, oyuncuyu tutuyor; (3) canavar korkunc/rahatsiz edici seste bagirir ve replik soyler (kac!); (4) '10'a kadar sayacagim' der, oyuncuyu birakir (kamera yere/geri dusus), (5) canavar geri cekilirken rahatsiz edici tonda 10'dan geri/ileri sayar; sayim bitince/oyuncu kacmaya baslayinca AV (chase) baslar. Canavarin agzi/kollari konusurken uygun animasyonla (scream/talk/grab/release) oynar.",
    "alt_sistemler": {
@@ -378,10 +517,20 @@
     "akis_kontrol": "Sinematik bitince GameState 'CHASE'e gecer; sayim suresi (10s) oyuncuya bas avantaji; sayim biterken canavar AV moduna (id14-16)."
    },
    "kabul_kriteri": "Oyun acilista kontrol kapali sinematikle baslar: kirpma->uyanma->canavar yuzde->bagiris+replik->birakma->10 sayim->av baslar; canavar animasyonlu, ses rahatsiz edici.",
-   "dosyalar": ["sahneler/AcilisSinematik.tscn (yeni)", "sahneler/sinematik.gd (yeni)", "parts/Canavar.tscn", "parts/canavar.gd", "addons/ses/SesYonetici.gd", "Dunya.tscn (oyun durumu)"]
+   "dosyalar": [
+    "sahneler/AcilisSinematik.tscn (yeni)",
+    "sahneler/sinematik.gd (yeni)",
+    "parts/Canavar.tscn",
+    "parts/canavar.gd",
+    "addons/ses/SesYonetici.gd",
+    "Dunya.tscn (oyun durumu)"
+   ]
   },
   {
-   "id": 25, "baslik": "Cikissiz dongu (exitless loop)", "oncelik": "yuksek", "durum": "yapilacak (Faz 1 sonrasi)",
+   "id": 25,
+   "baslik": "Cikissiz dongu (exitless loop)",
+   "oncelik": "yuksek",
+   "durum": "yapilacak (Faz 1 sonrasi)",
    "kaynak_promt": "cikissiz dongu olsun",
    "yaklasim": "Harita topolojisi zaten koridor ring/izgara dongusu. 'CIKIS' kapisindan gecince oyuncu sinsice baska bir baslangic/benzer bolgeye GERI dondurulur (teleport + hafif sahne degisimi) -> gercek cikis yok, kacis yanilsamasi. Korku: ayni yere tekrar varma.",
    "alt_sistemler": {
@@ -390,31 +539,57 @@
     "son": "Belli dongu sayisindan sonra ya kotu son (canavar yakalar) ya da gizli gercek cikis (opsiyonel)."
    },
    "kabul_kriteri": "Cikistan gecmek oyuncuyu basa/benzer bolgeye dondurur; gercek kacis yok hissi.",
-   "dosyalar": ["sahneler/dongu.gd (yeni)", "Dunya.tscn", "tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "sahneler/dongu.gd (yeni)",
+    "Dunya.tscn",
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 26, "baslik": "Siyah/dokusuz duvar arkasi (backface) duzeltme", "oncelik": "orta", "durum": "yapilacak (Faz 1/2)",
+   "id": 26,
+   "baslik": "Siyah/dokusuz duvar arkasi (backface) duzeltme",
+   "oncelik": "orta",
+   "durum": "yapilacak (Faz 1/2)",
    "kaynak_promt": "bazi duvarlarin arkasi siyah doku yok duzelt",
    "yaklasim": "Duvar mesh'leri tek yuzlu/cull_back oldugundan arkadan bakinca siyah/seffaf gorunuyor. Cozum: duvar materyalini cull_disabled (iki yuzlu) yap VEYA duvarlari iki yuzlu kutu olarak uret; dis sinir duvarlarinin ic yuzune de doku.",
    "kabul_kriteri": "Hicbir duvar arkadan siyah/dokusuz gorunmez.",
-   "dosyalar": ["parts/Duvar.tscn", "parts/Duvar2.tscn", "*_material.tres", "tools/dunya_uretici/insa_dunya.gd"]
+   "dosyalar": [
+    "parts/Duvar.tscn",
+    "parts/Duvar2.tscn",
+    "*_material.tres",
+    "tools/dunya_uretici/insa_dunya.gd"
+   ]
   },
   {
-   "id": 27, "baslik": "Odalar oyun oynasin (mekan hilekarligi)", "oncelik": "orta", "durum": "yapilacak (Faz 4)",
+   "id": 27,
+   "baslik": "Odalar oyun oynasin (mekan hilekarligi)",
+   "oncelik": "orta",
+   "durum": "yapilacak (Faz 4)",
    "kaynak_promt": "bazi odalar bize oyun oynasin",
    "yaklasim": "Belirli odalarda 'reality glitch': arkana donunce kapi/esya yer degistirir, isik aniden soner, ayni odaya tekrar girme (non-Euclidean), sahte cikis, kisa figur belirip kaybolma, sesli fisilti. Tetik: AreaTrigger + zamanlayici, ender ve dengeli.",
    "kabul_kriteri": "Bazi odalar girince ongorulemez sekilde degisir; tedirgin edici ama adil.",
-   "dosyalar": ["addons/hile_odasi/HileOdasi.gd (yeni)", "Dunya.tscn"]
+   "dosyalar": [
+    "addons/hile_odasi/HileOdasi.gd (yeni)",
+    "Dunya.tscn"
+   ]
   },
   {
-   "id": 29, "baslik": "Gercek backrooms: DUZENSIZ prosedurel harita (izgara DEGIL)", "oncelik": "kritik", "durum": "yapiliyor",
+   "id": 29,
+   "baslik": "Gercek backrooms: DUZENSIZ prosedurel harita (izgara DEGIL)",
+   "oncelik": "kritik",
+   "durum": "yapiliyor",
    "kaynak_promt": "duzenli istemiyorum gercek backrooms istiyorum, krokisi bile rahatsiz edici olsun, daha cesitli ve fazlasi",
    "yaklasim": "Elle dikdortgen-izgara YERINE tohumlanmis (deterministik) prosedurel uretim: rastgele boyut/konumlu COK sayida oda + aralarinda VOID icinden KIVRILAN koridor agi (MST + ekstra dongu kenarlari) -> kaotik labirent. Koridor acik, odalara oto kapi, salonlar acik. Kroki KARANLIK/tedirgin edici stilde cizilir (siyah zemin, kirmizi vurgular).",
    "kabul_kriteri": "Harita izgara gibi DEGIL; duzensiz, cesitli, labirentvari; kroki bile rahatsiz edici; baglanti dogrulanir.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py"
+   ]
   },
   {
-   "id": 30, "baslik": "Iki katli harita + merdivenler", "oncelik": "yuksek", "durum": "yapilacak (sirada)",
+   "id": 30,
+   "baslik": "Iki katli harita + merdivenler",
+   "oncelik": "yuksek",
+   "durum": "yapilacak (sirada)",
    "kaynak_promt": "iki katli olsun merdivenler olsun",
    "yaklasim": "Iki bagimsiz duzensiz kat (Kat0 y=0, Kat1 y=WALL_H+~0.5). Merdiven kovasi: iki katta da koridor olan ortak (i,j) noktalarinda merdiven (basamak kutulari ya da rampa) + ust kat zemininde delik. Insa pipeline'i kat-dongusune cevrilir (her instance kat-y ofseti). Navigasyon iki katta gecerli.",
    "alt_sistemler": {
@@ -424,28 +599,86 @@
     "gecis": "Oyuncu merdivenden cikar; canavar navmesh iki katta (link)."
    },
    "kabul_kriteri": "Iki kat var, merdivenle gecilir; oyuncu cikabilir; canavar takip edebilir.",
-   "dosyalar": ["tools/dunya_uretici/dunya_uret.py", "tools/dunya_uretici/insa_dunya.gd", "parts/Merdiven.tscn (yeni)"]
+   "dosyalar": [
+    "tools/dunya_uretici/dunya_uret.py",
+    "tools/dunya_uretici/insa_dunya.gd",
+    "parts/Merdiven.tscn (yeni)"
+   ]
   },
   {
-   "id": 28, "baslik": "Korkunc/psikolojik altyazilar", "oncelik": "orta", "durum": "yapilacak (Faz 4)",
+   "id": 28,
+   "baslik": "Korkunc/psikolojik altyazilar",
+   "oncelik": "orta",
+   "durum": "yapilacak (Faz 4)",
    "kaynak_promt": "altta korkunc psikoloji bozan altyazi da ekle",
    "yaklasim": "Ekran altinda ara ara beliren rahatsiz edici ic-ses/fisilti altyazilari (canavarin ya da mekanin sesi). Tetik: bolgeye girme, canavar yakinligi, dongu sayisi. Ornek: 'Buraya daha once geldin.' / 'Cikis yok. Hic olmadi.' / 'Korktugunda daha lezzetli oluyorsun.' Yazi titreme/glitch efekti.",
    "kabul_kriteri": "Belli anlarda ekran altinda tedirgin edici altyazi belirir; atmosfere uyumlu.",
-   "dosyalar": ["arayuz/Altyazi.tscn (yeni)", "arayuz/altyazi.gd (yeni)", "Dunya.tscn"]
+   "dosyalar": [
+    "arayuz/Altyazi.tscn (yeni)",
+    "arayuz/altyazi.gd (yeni)",
+    "Dunya.tscn"
+   ]
   }
  ],
-
  "yol_haritasi": {
   "aciklama": "Bagimlilik sirasi: once dunya/generator (deterministik, dogrulanabilir), sonra runtime sistemler, en son APK.",
   "fazlar": [
-   {"faz": 1, "ad": "Dunya temel (generator)", "kapsam": [5,6,9,11,12,18,13], "cikti": "10x, moduler duvar/zemin, kapi fix, sahte/sizmasiz isik, desenli kir, buyuk harita; kroki+render ile dogrulanir."},
-   {"faz": 2, "ad": "Performans", "kapsam": [1,2], "cikti": "Isik bake/cull + chunk yukleme; mobilde sabit FPS."},
-   {"faz": 3, "ad": "Oyuncu sistemleri", "kapsam": [17,8,7], "cikti": "Hareket modlari+stamina, fener+pil, mobil kontrol+HUD."},
-   {"faz": 4, "ad": "Canavar AI + ses + animasyon", "kapsam": [14,15,16,4,3,10], "cikti": "NavMesh AI, flanking, stalking, anim tree, ses sistemi, titreyen isik."},
-   {"faz": 5, "ad": "APK", "kapsam": [22], "cikti": "Imzali Android APK + indirme linki."}
+   {
+    "faz": 1,
+    "ad": "Dunya temel (generator)",
+    "kapsam": [
+     5,
+     6,
+     9,
+     11,
+     12,
+     18,
+     13
+    ],
+    "cikti": "10x, moduler duvar/zemin, kapi fix, sahte/sizmasiz isik, desenli kir, buyuk harita; kroki+render ile dogrulanir."
+   },
+   {
+    "faz": 2,
+    "ad": "Performans",
+    "kapsam": [
+     1,
+     2
+    ],
+    "cikti": "Isik bake/cull + chunk yukleme; mobilde sabit FPS."
+   },
+   {
+    "faz": 3,
+    "ad": "Oyuncu sistemleri",
+    "kapsam": [
+     17,
+     8,
+     7
+    ],
+    "cikti": "Hareket modlari+stamina, fener+pil, mobil kontrol+HUD."
+   },
+   {
+    "faz": 4,
+    "ad": "Canavar AI + ses + animasyon",
+    "kapsam": [
+     14,
+     15,
+     16,
+     4,
+     3,
+     10
+    ],
+    "cikti": "NavMesh AI, flanking, stalking, anim tree, ses sistemi, titreyen isik."
+   },
+   {
+    "faz": 5,
+    "ad": "APK",
+    "kapsam": [
+     22
+    ],
+    "cikti": "Imzali Android APK + indirme linki."
+   }
   ]
  },
-
  "riskler_ve_notlar": [
   "APK icin Godot Android export template + SDK gerekir; bu uzak ortamda kurulu olmayabilir — faz 5'te kontrol edilip, yoksa alternatif (build talimati + GitHub Actions APK) sunulacak.",
   "LightmapGI bake suresi buyuk haritada uzun olabilir; gerekirse sadece kritik bolgeler bake, gerisi cull.",

@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dte4yflfly7s6"
 path.s3tc="res://.godot/imported/floor_rough.png-b9818796e242728820fadbf156b750dd.s3tc.ctex"
+path.etc2="res://.godot/imported/floor_rough.png-b9818796e242728820fadbf156b750dd.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://textures/floor_rough.png"
-dest_files=["res://.godot/imported/floor_rough.png-b9818796e242728820fadbf156b750dd.s3tc.ctex"]
+dest_files=["res://.godot/imported/floor_rough.png-b9818796e242728820fadbf156b750dd.s3tc.ctex", "res://.godot/imported/floor_rough.png-b9818796e242728820fadbf156b750dd.etc2.ctex"]
 
 [params]
 
