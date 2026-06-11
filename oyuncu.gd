@@ -56,6 +56,8 @@ var _adim_son := 0
 var _gicirti_sesleri: Array = []
 var _gicirti: AudioStreamPlayer
 var _gicirti_t := 18.0
+# kapi otomatik acilma
+var _kapi_t := 0.0
 
 # hud
 var _stam_dolu: ColorRect
@@ -295,6 +297,7 @@ func _physics_process(delta: float) -> void:
 	_egilme_uygula(delta)
 	_fener_guncelle(delta)
 	_pil_kontrol()
+	_kapi_guncelle(delta)
 	_ses_guncelle(delta)
 	_ayak_guncelle(delta, kos_istek, sessiz)
 	_hud_guncelle(delta)
@@ -334,6 +337,20 @@ func _pil_kontrol() -> void:
 		if p is Node3D and global_position.distance_to((p as Node3D).global_position) < 1.6:
 			_fener_sarj = min(fener_sarj_max, _fener_sarj + pil_dolum)
 			p.queue_free()
+
+# Kapilar yaklasinca otomatik acilir, uzaklasinca kapanir (mobilde dugme gerekmez).
+func _kapi_guncelle(delta: float) -> void:
+	_kapi_t -= delta
+	if _kapi_t > 0.0: return
+	_kapi_t = 0.2
+	for k in get_tree().get_nodes_in_group("kapilar"):
+		if not (k is Node3D): continue
+		var d := global_position.distance_to((k as Node3D).global_position)
+		var acik = k.get("acik")
+		if d < 2.7 and acik == false:
+			k.call("ac")
+		elif d > 4.0 and acik == true:
+			k.call("kapat")
 
 # ----------------------------------------------------- SES
 ## Panik bagirmasi - SADECE dogru anda, uzun bekleme ile (sik calmaz).

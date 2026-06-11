@@ -43,15 +43,16 @@ def piper(metin, ham):
     return p.returncode == 0 and os.path.exists(ham)
 
 def iblis(ham, son):
-    # Oktav asagi (low) + bir oktav daha (sub growl, kisik) + reverb + bant + titreme.
+    # NET ama tehditkar: olculu pitch-down (~2.8 yari-ton) + hafif derin katman (kisik) +
+    # KISA tek reverb + tiz parlaklik (anlasilirlik) + kompres. Bogukluk YOK.
     fc = (
-        f"[0:a]asetrate={SR}*0.80,aresample={SR},atempo=1.25[low];"
-        f"[0:a]asetrate={SR}*0.50,aresample={SR},atempo=2.0,volume=0.55[sub];"
-        f"[low][sub]amix=inputs=2:weights=1 0.6:normalize=0[mix];"
-        f"[mix]aecho=0.85:0.9:60|130:0.45|0.25[rev];"
-        f"[rev]highpass=f=70,lowpass=f=7200,tremolo=f=5.5:d=0.25,"
-        f"acompressor=threshold=-18dB:ratio=4:attack=5:release=120,"
-        f"volume=2.1,alimiter=limit=0.95[out]"
+        f"[0:a]asetrate={SR}*0.85,aresample={SR},atempo=1.17647[low];"
+        f"[0:a]asetrate={SR}*0.72,aresample={SR},atempo=1.38889,volume=0.32[sub];"
+        f"[low][sub]amix=inputs=2:weights=1 0.32:normalize=0[mix];"
+        f"[mix]aecho=0.8:0.7:38:0.22[rev];"
+        f"[rev]highpass=f=88,lowpass=f=9800,treble=g=3.5:f=3500,"
+        f"acompressor=threshold=-16dB:ratio=3:attack=6:release=110,"
+        f"volume=1.95,alimiter=limit=0.96[out]"
     )
     cmd = ["ffmpeg", "-y", "-i", ham, "-filter_complex", fc,
            "-map", "[out]", "-ar", str(SR), "-ac", "1", "-acodec", "pcm_s16le", son]

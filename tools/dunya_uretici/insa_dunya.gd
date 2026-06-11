@@ -67,6 +67,8 @@ func _instance(it: Dictionary) -> void:
 	n.transform = _xform(it["pos"], it["rot"], sc)
 	var ust := grup_obje if part in ["Mazgal","GuvenlikKamerasi","EndustriyelLamba","CopKutusu","ElektrikPanosu","Kapi"] else grup_yapi
 	ust.add_child(n); n.owner = kok
+	if part == "Kapi":
+		n.add_to_group("kapilar", true)   # persistent: .tscn'e kaydedilir (oyuncu otomatik acar)
 
 	# carpisma kutusu (col = [sx,sy,sz, offy]); olcek baked.
 	if it.get("col") != null:

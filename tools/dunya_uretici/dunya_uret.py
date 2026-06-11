@@ -15,7 +15,8 @@ from matplotlib.patches import Rectangle, Arc
 from matplotlib.lines import Line2D
 
 PROJE="/home/user/Backrooms"; OUT=os.path.join(PROJE,"tools","dunya_uretici")
-CELL,WALL_H,Y0=4.0,3.0,0.0; DOOR_W=1.42; FILL_W=(CELL-DOOR_W)/2.0
+CELL,WALL_H,Y0=4.0,6.0,0.0; DOOR_W=1.42; FILL_W=(CELL-DOOR_W)/2.0
+SEG_H=3.0   # tek duvar parcasi yuksekligi; WALL_H/SEG_H kat ust uste yiginlanir (doku korunur)
 
 PARTS={
  "Zemin":{"kind":"floor","tex":"zemin_ref","size":[4,0.12,4]},
@@ -142,7 +143,7 @@ for i in range(NR):
         add_inst("EndustriyelLamba", x,z,90.0 if (i+j)%2 else 0.0,y=Y0+WALL_H-0.28)
         if i%3==1 and j%3==1:               # ISIK OPT (Faz2): 9 hucrede 1 gercek isik
             col_,en_,rng_=ISIK[ODA[r][3]]
-            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*2.6,"range":rng_*1.5})
+            lights.append({"pos":[x,Y0+WALL_H-0.5,z],"color":col_,"energy":en_*3.3,"range":rng_*2.2})
 
 # DUVAR + KAPI (kenar bazli; KAPI_SET ciftlerinde kapi)
 _ind=set(r for r in TEMA_OF if TEMA_OF[r] in ("bakim","kazan","yaratik","arsiv","islak","lab","morg"))
@@ -150,16 +151,26 @@ def wall_part_for(a,b): return "Duvar2" if ({a,b}&_ind) else "Duvar"
 def edge_door(a,b): return (a is not None and b is not None and tuple(sorted((a,b))) in KAPI_SET)
 def edge_geom(kind,i,j): return (j*CELL-2,i*CELL,90.0) if kind=='V' else (j*CELL,i*CELL-2,0.0)
 def seg_bp(kind,x,z): return (x,z-2,x,z+2) if kind=='V' else (x-2,z,x+2,z)
-def place_wall(x,z,rot,part): add_inst(part,x,z,rot,y=Y0,col=[4,3,0.2,1.5]); wall_segs_bp.append(seg_bp('V' if abs(rot-90)<1 else 'H',x,z))
+def stack_wall(part,x,z,rot,sx=1.0):
+    # WALL_H/SEG_H adet duvar parcasini ust uste koy (doku tekrari korunur);
+    # carpisma TEK uzun kutu (ilk parcaya bagli, tam yukseklik).
+    kat=int(round(WALL_H/SEG_H))
+    for k in range(kat):
+        c=[4,WALL_H,0.2,WALL_H/2.0] if k==0 else None
+        add_inst(part,x,z,rot,y=Y0+k*SEG_H,scale=(sx,1,1),col=c)
+def place_wall(x,z,rot,part):
+    stack_wall(part,x,z,rot)
+    wall_segs_bp.append(seg_bp('V' if abs(rot-90)<1 else 'H',x,z))
 def place_door(x,z,rot,part):
     add_inst("Kapi",x,z,rot,y=Y0)
-    off=DOOR_W/2+FILL_W/2; sx=FILL_W/CELL; lnt_sx=DOOR_W/CELL; lnt_sy=1.0/WALL_H
+    off=DOOR_W/2+FILL_W/2; sx=FILL_W/CELL; lnt_sx=DOOR_W/CELL; lnt_sy=(WALL_H-2.0)/SEG_H
     if abs(rot-90)<1 or abs(rot-270)<1:
-        add_inst(part,x,z+off,rot,y=Y0,scale=(sx,1,1),col=[4,3,0.2,1.5])
-        add_inst(part,x,z-off,rot,y=Y0,scale=(sx,1,1),col=[4,3,0.2,1.5])
+        stack_wall(part,x,z+off,rot,sx)
+        stack_wall(part,x,z-off,rot,sx)
     else:
-        add_inst(part,x+off,z,rot,y=Y0,scale=(sx,1,1),col=[4,3,0.2,1.5])
-        add_inst(part,x-off,z,rot,y=Y0,scale=(sx,1,1),col=[4,3,0.2,1.5])
+        stack_wall(part,x+off,z,rot,sx)
+        stack_wall(part,x-off,z,rot,sx)
+    # kapi ustu lento: 2.0'dan WALL_H'e kadar (doku dikey gerilir - kapi ustu, sorun degil)
     add_inst(part,x,z,rot,y=Y0+2.0,scale=(lnt_sx,lnt_sy,1),col=[4,3,0.2,1.5])
 for i in range(NR):
     for j in range(NC+1):
