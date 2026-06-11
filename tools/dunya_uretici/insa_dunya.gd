@@ -33,6 +33,8 @@ func _init() -> void:
 		_leke(st)
 	_oyuncu(plan["spawn"])
 	_chunk_yonetici()
+	_nav_izgara()
+	_sinematik()
 
 	var ps := PackedScene.new()
 	var hata := ps.pack(kok)
@@ -133,7 +135,7 @@ func _oyuncu(spawn: Array) -> void:
 	p.position = Vector3(spawn[0], spawn[1], spawn[2])
 	p.set_script(load("res://oyuncu.gd"))
 	kok.add_child(p); p.owner = kok          # once agaca ekle ki owner=kok gecerli olsun
-	var cs := CollisionShape3D.new()
+	var cs := CollisionShape3D.new(); cs.name = "CollisionShape3D"
 	var cap := CapsuleShape3D.new(); cap.height = 1.7; cap.radius = 0.35
 	cs.shape = cap; cs.position = Vector3(0, 0.85, 0)
 	p.add_child(cs); cs.owner = kok
@@ -152,3 +154,13 @@ func _chunk_yonetici() -> void:
 	kok.add_child(cy); cy.owner = kok
 	cy.set("oyuncu_yolu", NodePath("../Oyuncu"))
 	cy.set("chunk", 14.0); cy.set("yaricap", 3)
+
+func _nav_izgara() -> void:
+	var n := Node.new(); n.name = "NavIzgara"
+	n.set_script(load("res://addons/nav/NavIzgara.gd"))
+	kok.add_child(n); n.owner = kok
+
+func _sinematik() -> void:
+	var n := Node.new(); n.name = "Sinematik"
+	n.set_script(load("res://sahneler/sinematik.gd"))
+	kok.add_child(n); n.owner = kok

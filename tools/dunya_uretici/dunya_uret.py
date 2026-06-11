@@ -126,7 +126,7 @@ def rid(i,j):
 def _bb(r):
     cs=_hc[r]; ii=[c[0] for c in cs]; jj=[c[1] for c in cs]; return min(ii),max(ii),min(jj),max(jj)
 
-instances=[]; lights=[]; stains=[]; door_edges_bp=[]; wall_segs_bp=[]
+instances=[]; lights=[]; stains=[]; door_edges_bp=[]; wall_segs_bp=[]; nav_kapi=[]
 def add_inst(part,x,z,rot=0.0,y=Y0,scale=(1,1,1),col=None):
     instances.append({"part":part,"pos":[round(x,3),round(y,3),round(z,3)],
                       "rot":round(rot,2),"scale":[round(s,4) for s in scale],"col":col})
@@ -167,7 +167,7 @@ for i in range(NR):
         if L==R and L is not None: continue
         if L is None and R is None: continue
         x,z,rot=edge_geom('V',i,j); part=wall_part_for(L,R)
-        if edge_door(L,R): place_door(x,z,rot,part); door_edges_bp.append((x,z,False))
+        if edge_door(L,R): place_door(x,z,rot,part); door_edges_bp.append((x,z,False)); nav_kapi.append((i,j-1,i,j))
         else: place_wall(x,z,rot,part)
 for i in range(NR+1):
     for j in range(NC):
@@ -175,11 +175,12 @@ for i in range(NR+1):
         if T==B and T is not None: continue
         if T is None and B is None: continue
         x,z,rot=edge_geom('H',i,j); part=wall_part_for(T,B)
-        if edge_door(T,B): place_door(x,z,rot,part); door_edges_bp.append((x,z,True))
+        if edge_door(T,B): place_door(x,z,rot,part); door_edges_bp.append((x,z,True)); nav_kapi.append((i-1,j,i,j))
         else: place_wall(x,z,rot,part)
 
 # OBJELER (tema bazli)
 OBJELER=[]
+creature_hucre=[0,0]
 def _o(part,i,j,dx,dz,rot,scale=None): OBJELER.append((part,(i,j),(dx,dz),rot)+((scale,) if scale else ()))
 def themed(r):
     th=TEMA_OF[r]; i0,i1,j0,j1=_bb(r); cI,cJ=(i0+i1)//2,(j0+j1)//2
@@ -214,6 +215,7 @@ def themed(r):
         _o("GuvenlikKamerasi",i0,j0,1.4,-1.4,120)
     elif th=="yaratik":
         _o("Canavar",i1-1,cJ,0,0,200)
+        creature_hucre[0]=i1-1; creature_hucre[1]=cJ
         for (ci,cj) in [(i0,j0+1),(i0,j1-1),(cI,j0),(cI,j1)]: _o("Mazgal",ci,cj,0,0,0)
         _o("GuvenlikKamerasi",i0,j0,1.4,-1.4,120); _o("CopKutusu",i1,j0,0,0,0)
     elif th=="cikis":
@@ -249,7 +251,8 @@ sx,sz=cell_center(3,5); spawn=[sx,Y0+1.0,sz]
 
 plan={"cell":CELL,"wall_h":WALL_H,"y0":Y0,"nr":NR,"nc":NC,"parts_meta":PARTS,
       "instances":instances,"lights":lights,"stains":stains,"spawn":spawn,
-      "grid":["".join(r) for r in GRID],"rooms":{r:[ODA[r][0],ODA[r][1]] for r in ODA}}
+      "grid":["".join(r) for r in GRID],"rooms":{r:[ODA[r][0],ODA[r][1]] for r in ODA},
+      "nav_kapi":nav_kapi,"yaratik_hucre":creature_hucre}
 with open(os.path.join(OUT,"dunya_plan.json"),"w") as f: json.dump(plan,f,indent=1)
 print("instances:",len(instances),"lights:",len(lights),"oda:",len([r for r in ODA if TEMA_OF[r]!='koridor']),
       "koridor:",len([r for r in ODA if TEMA_OF[r]=='koridor']),"kapi:",sum(1 for _ in door_edges_bp))

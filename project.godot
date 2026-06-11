@@ -12,11 +12,12 @@ config_version=5
 
 config/name="Parça Yerleştirici"
 run/main_scene="res://Dunya.tscn"
+config/features=PackedStringArray("4.6", "Mobile")
 
 [autoload]
 
 OyunDurumu="*res://OyunDurumu.gd"
-config/features=PackedStringArray("4.6", "Mobile")
+Altyazi="*res://Altyazi.gd"
 
 [display]
 

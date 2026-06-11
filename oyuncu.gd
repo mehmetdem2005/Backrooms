@@ -180,6 +180,7 @@ func _buton_ustunde(p: Vector2) -> bool:
 
 # ----------------------------------------------------- GIRDI
 func _unhandled_input(olay: InputEvent) -> void:
+	if _od and _od.sinematik: return
 	if olay is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-olay.relative.x * fare_hassas)
 		_kam.rotate_x(-olay.relative.y * fare_hassas)
@@ -218,7 +219,7 @@ func _unhandled_input(olay: InputEvent) -> void:
 
 # ----------------------------------------------------- HAREKET
 func _physics_process(delta: float) -> void:
-	if _olu:
+	if _olu or (_od and _od.sinematik):
 		return
 	# mobil bakis uygula
 	if _mobil and _mobil_bak != Vector2.ZERO:
@@ -353,7 +354,9 @@ func _alarm_bit() -> void:
 
 func _canavar_kontrol() -> void:
 	if _olu or not _od or _od.canavar == null: return
-	if global_position.distance_to(_od.canavar.global_position) < 1.4:
+	var b: Vector3 = (_od.canavar as Node3D).global_position
+	var yatay := Vector2(global_position.x - b.x, global_position.z - b.z).length()
+	if yatay < 1.5:
 		_od.yakalandi()
 
 func _yakalandi() -> void:
