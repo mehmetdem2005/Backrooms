@@ -46,6 +46,17 @@ var _nefes_agir_acik := false
 var _shout_cd := 0.0           # panik bagirmasi bekleme (sik calmasin)
 var _canavar_yakindi := false  # canavar yakinlik kenari (ani urkme tetigi)
 
+# ayak sesleri (mesafe-bazli tempo: otomatik silah gibi degil, hiza gore dogal)
+var _adim_sesleri: Array = []
+var _adim_havuz: Array = []
+var _adim_idx := 0
+var _adim_mesafe := 0.0
+var _adim_son := 0
+# duvar/yapi gicirtisi (ortam, ara ara)
+var _gicirti_sesleri: Array = []
+var _gicirti: AudioStreamPlayer
+var _gicirti_t := 18.0
+
 # hud
 var _stam_dolu: ColorRect
 var _bat_dolu: ColorRect
@@ -108,6 +119,18 @@ func _ses_kur() -> void:
 	_alarm = _player(_loop_stream("res://audio/alarm.wav"), -6.0)
 	_shout = _player(load("res://audio/bagir.wav"), -2.0)
 	_nefes.play(); _kalp.play()
+	# ayak sesleri: 5 varyasyon + 3'lu calici havuzu (ust uste binebilsin)
+	for i in range(1, 6):
+		var s = load("res://audio/ayak/adim%d.wav" % i)
+		if s: _adim_sesleri.append(s)
+	for _i in range(3):
+		var a := AudioStreamPlayer.new(); a.volume_db = -10.0; add_child(a)
+		_adim_havuz.append(a)
+	# duvar/yapi gicirtisi (ortam)
+	for i in range(1, 3):
+		var g = load("res://audio/ayak/gicirti%d.wav" % i)
+		if g: _gicirti_sesleri.append(g)
+	_gicirti = _player(null, -20.0)
 
 # ----------------------------------------------------- HUD
 func _bar(cl: CanvasLayer, y_ofs: int, renk: Color) -> ColorRect:
@@ -273,6 +296,7 @@ func _physics_process(delta: float) -> void:
 	_fener_guncelle(delta)
 	_pil_kontrol()
 	_ses_guncelle(delta)
+	_ayak_guncelle(delta, kos_istek, sessiz)
 	_hud_guncelle(delta)
 	_canavar_kontrol()
 
@@ -342,6 +366,46 @@ func _ses_guncelle(delta: float) -> void:
 		if d < 18.0: hedef_kalp = maxf(hedef_kalp, lerpf(-4.0, -22.0, clampf(d / 18.0, 0, 1)))
 	_kalp.volume_db = lerpf(_kalp.volume_db, hedef_kalp, 3.0 * delta)
 	_kalp.pitch_scale = lerpf(_kalp.pitch_scale, (1.5 if alarm_aktif else 1.0), 2.0 * delta)
+
+# ----------------------------------------------------- AYAK SESLERI + ORTAM
+func _ayak_guncelle(delta: float, kosuyor: bool, sessiz: bool) -> void:
+	# duvar/yapi gicirtisi (ortam) - ara ara, dusuk ses
+	_gicirti_t -= delta
+	if _gicirti_t <= 0.0 and not _gicirti_sesleri.is_empty() and _gicirti and not _gicirti.playing:
+		_gicirti.stream = _gicirti_sesleri[randi() % _gicirti_sesleri.size()]
+		_gicirti.pitch_scale = randf_range(0.9, 1.1)
+		_gicirti.play()
+		_gicirti_t = randf_range(22.0, 46.0)
+	# ayak sesleri: yere basiyorken + gercek yatay hareket varken (duvara dayaninca durur)
+	if not is_on_floor() or _adim_sesleri.is_empty(): return
+	var yatay := Vector2(velocity.x, velocity.z).length()
+	if yatay < 0.6:
+		return
+	_adim_mesafe += yatay * delta
+	# adim uzunlugu/ses moda gore (tempo DOGAL: makineli tufek gibi degil)
+	var adim_uz := 1.5
+	var vol := -8.0
+	if _egik:
+		adim_uz = 1.25; vol = -19.0       # egilince kisa+sessiz
+	elif sessiz:
+		adim_uz = 1.45; vol = -15.0       # sessiz yuruyus
+	elif kosuyor:
+		adim_uz = 1.95; vol = -3.0        # kosma: uzun adim, gur
+	if _adim_mesafe >= adim_uz:
+		_adim_mesafe = 0.0
+		_adim_cal(vol)
+
+func _adim_cal(vol: float) -> void:
+	var i := randi() % _adim_sesleri.size()
+	if i == _adim_son and _adim_sesleri.size() > 1:
+		i = (i + 1) % _adim_sesleri.size()   # ust uste ayni sample olmasin
+	_adim_son = i
+	var a: AudioStreamPlayer = _adim_havuz[_adim_idx]
+	_adim_idx = (_adim_idx + 1) % _adim_havuz.size()
+	a.stream = _adim_sesleri[i]
+	a.volume_db = vol
+	a.pitch_scale = randf_range(0.92, 1.08)
+	a.play()
 
 # ----------------------------------------------------- HUD GUNCELLE
 func _hud_guncelle(delta: float) -> void:

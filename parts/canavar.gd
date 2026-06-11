@@ -3,12 +3,20 @@ extends Node3D
 ## durum makinesi: AVLA(kovala) / KESISME(onunu kes, dengeli) / ARA(son gorulen/ses) / DEVRIYE.
 ## Sadece av aktifken (OyunDurumu.av_modu veya alarm) avlar; oncesi sinematik kontrolunde.
 
-@export var animasyon: String = "NlaTrack_009"
 @export var devriye_hiz: float = 1.6
 @export var ara_hiz: float = 2.8
 @export var avla_hiz: float = 3.9
 @export var gorus_menzil: float = 24.0
 @export var gorus_aci: float = 0.40       # cos(esik) ~66 derece yari-aci
+
+# Animasyon klipleri (GLB icindeki NlaTrack'lar):
+#   IDLE = sakin (yerinde), YURU = yurume dongusu, KOS = kosma dongusu.
+# Yurume/kosma kliplerinde kok kemik ileri kayiyor -> ortak anchor'a sabitlenir
+# (hem kayma engellenir hem klip degisiminde isinlanma olmaz). speed_scale hiza gore.
+const ANIM_IDLE := "NlaTrack_009"
+const ANIM_YURU := "NlaTrack_003"
+const ANIM_KOS  := "NlaTrack_001"
+var _aktif_anim := ""
 
 var _ap: AnimationPlayer
 var _od: Node
@@ -49,12 +57,19 @@ var _growl_acik := false
 func _ready() -> void:
 	_ap = find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _ap:
-		var ad := animasyon
-		if ad == "" or not _ap.has_animation(ad):
+		# kullanilacak kliplerin kok pozisyonunu IDLE'in anchor'ina sabitle (kayma + isinlanma onle)
+		var anchor := _kok_deger(ANIM_IDLE)
+		for nm in [ANIM_IDLE, ANIM_YURU, ANIM_KOS]:
+			if _ap.has_animation(nm):
+				_kok_sabitle(nm, anchor)
+				_ap.get_animation(nm).loop_mode = Animation.LOOP_LINEAR
+		# yedek: klipler yoksa ilk animasyon
+		if not _ap.has_animation(ANIM_IDLE):
 			var liste := _ap.get_animation_list()
-			if not liste.is_empty(): ad = liste[0]
-		if _ap.has_animation(ad): _ap.get_animation(ad).loop_mode = Animation.LOOP_LINEAR
-		if ad != "": _ap.play(ad)
+			if not liste.is_empty():
+				_aktif_anim = liste[0]; _ap.play(liste[0]); return
+		_aktif_anim = ANIM_IDLE
+		_ap.play(ANIM_IDLE)
 	_ev = global_position
 	var s = load("res://audio/canavar_growl.wav")
 	if s is AudioStreamWAV:
@@ -82,7 +97,7 @@ func _physics_process(delta: float) -> void:
 	if not avda or _player == null or _nav == null:
 		_durum = "UYKU"
 		if _growl_acik: _growl.stop(); _growl_acik = false
-		if _ap: _ap.speed_scale = 1.0
+		_anim_uygula("UYKU")
 		return
 	_algi(delta)
 	_karar(delta)
@@ -195,10 +210,45 @@ func _yenile_yol() -> void:
 	_yol = _nav.yol(global_position, _hedef)
 	_yol_i = 1 if _yol.size() > 1 else 0
 
+# ----------------------------------------------------- KOK KEMIK NORMALIZE
+func _kok_track(an: Animation) -> int:
+	for t in an.get_track_count():
+		if an.track_get_type(t) == Animation.TYPE_POSITION_3D and str(an.track_get_path(t)).ends_with(":Root"):
+			return t
+	return -1
+
+func _kok_deger(nm: String) -> Vector3:
+	if _ap == null or not _ap.has_animation(nm): return Vector3.ZERO
+	var an := _ap.get_animation(nm)
+	var t := _kok_track(an)
+	return an.track_get_key_value(t, 0) if t >= 0 else Vector3.ZERO
+
+func _kok_sabitle(nm: String, anchor: Vector3) -> void:
+	var an := _ap.get_animation(nm)
+	var t := _kok_track(an)
+	if t < 0: return
+	for k in an.track_get_key_count(t):
+		an.track_set_key_value(t, k, anchor)
+
+# Duruma gore klip + hiz sec (hiz, ayak kaymasini azaltacak sekilde travel hizina yakin).
+func _anim_uygula(durum: String) -> void:
+	if _ap == null: return
+	var anim := ANIM_IDLE
+	var hiz := 1.0
+	match durum:
+		"AVLA", "KESISME": anim = ANIM_KOS;  hiz = 1.45   # kosma
+		"ARA":             anim = ANIM_YURU; hiz = 1.05   # tedirgin yurume
+		"DEVRIYE":         anim = ANIM_YURU; hiz = 0.6    # yavas yurume
+		_:                 anim = ANIM_IDLE; hiz = 1.0    # UYKU / sakin
+	if anim != _aktif_anim and _ap.has_animation(anim):
+		_aktif_anim = anim
+		_ap.play(anim, 0.25)        # yumusak gecis (0.25s blend)
+	_ap.speed_scale = hiz
+
 # ----------------------------------------------------- ANIM + SES
 func _anim_ses() -> void:
 	var kov := _durum == "AVLA" or _durum == "KESISME"
-	if _ap: _ap.speed_scale = 1.7 if kov else (1.2 if _durum == "ARA" else 1.0)
+	_anim_uygula(_durum)
 	var sesli := kov or _mesafe < 8.0
 	if sesli and not _growl_acik:
 		_growl.play(); _growl_acik = true
