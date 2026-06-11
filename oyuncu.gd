@@ -43,6 +43,8 @@ var _shout: AudioStreamPlayer
 var _nefes_normal: AudioStream
 var _nefes_agir: AudioStream
 var _nefes_agir_acik := false
+var _shout_cd := 0.0           # panik bagirmasi bekleme (sik calmasin)
+var _canavar_yakindi := false  # canavar yakinlik kenari (ani urkme tetigi)
 
 # hud
 var _stam_dolu: ColorRect
@@ -310,8 +312,22 @@ func _pil_kontrol() -> void:
 			p.queue_free()
 
 # ----------------------------------------------------- SES
+## Panik bagirmasi - SADECE dogru anda, uzun bekleme ile (sik calmaz).
+func _panik_bagir() -> void:
+	if _shout_cd > 0.0 or (_shout and _shout.playing): return
+	if _shout: _shout.play()
+	_shout_cd = randf_range(26.0, 38.0)
+
 func _ses_guncelle(delta: float) -> void:
+	_shout_cd = max(0.0, _shout_cd - delta)
 	var alarm_aktif := _od != null and bool(_od.alarm)
+	# ANI URKME: canavar av sirasinda aniden yakina girince bir kez bagir.
+	if _od and _od.canavar and (alarm_aktif or bool(_od.av_modu)):
+		var yk: float = global_position.distance_to((_od.canavar as Node3D).global_position)
+		var yakin := yk < 6.0
+		if yakin and not _canavar_yakindi:
+			_panik_bagir()
+		_canavar_yakindi = yakin
 	var agir := _eforlu or stamina < 35.0 or _bitkin or alarm_aktif
 	if agir != _nefes_agir_acik:
 		_nefes_agir_acik = agir
@@ -344,7 +360,7 @@ func _alarm_basla() -> void:
 	_alarm_yaniyor = true
 	if _alarm_lbl: _alarm_lbl.visible = true
 	if _alarm and not _alarm.playing: _alarm.play()
-	if _shout: _shout.play()
+	_panik_bagir()   # alarm aninda bir kez (cooldown'lu)
 
 func _alarm_bit() -> void:
 	_alarm_yaniyor = false

@@ -15,6 +15,22 @@ var _od: Node
 var _player: Node3D
 var _nav: Node
 var _growl: AudioStreamPlayer3D
+var _konus: AudioStreamPlayer3D     # canavar KONUSMASI (iblis ses, konumdan gelir)
+var _konus_cd := 8.0                # ilk replige kadar bekleme
+var _alt: Node
+
+# Av sirasinda ara ara soylenen replikler (konum-bazli, uzun bekleme ile).
+const AV_METIN := {
+	"av1": "Neredesin? Kokunu aliyorum.",
+	"av2": "Saklanmak seni kurtarmayacak.",
+	"av3": "Daha hizli kos. Hadi, eglendir beni.",
+	"av4": "Kalbini duyabiliyorum. Ne kadar da hizli atiyor.",
+	"av5": "Geri gel buraya, seni lanet olasi.",
+	"av6": "Bu duvarlar benim. Sen sadece... etsin.",
+	"av7": "Yoruldugunu biliyorum. Dur biraz. Dur da seni yakalayayim.",
+	"av8": "Bu sefer canin daha cok yanacak.",
+}
+var _av_adlar: Array = []
 
 var _durum := "UYKU"
 var _ev: Vector3
@@ -48,6 +64,12 @@ func _ready() -> void:
 	_growl.stream = s; _growl.pitch_scale = 0.85; _growl.unit_size = 9.0
 	_growl.max_distance = 32.0; _growl.volume_db = 4.0
 	add_child(_growl)
+	# konusma kanali (iblis ses dosyalari, konumdan gelir)
+	_konus = AudioStreamPlayer3D.new()
+	_konus.unit_size = 14.0; _konus.max_distance = 40.0; _konus.volume_db = 6.0
+	add_child(_konus)
+	_av_adlar = AV_METIN.keys()
+	_alt = get_node_or_null("/root/Altyazi")
 	_od = get_node_or_null("/root/OyunDurumu")
 	if _od: _od.canavar = self
 
@@ -66,6 +88,7 @@ func _physics_process(delta: float) -> void:
 	_karar(delta)
 	_hareket(delta)
 	_anim_ses()
+	_konusma(delta)
 
 # ----------------------------------------------------- ALGI
 func _algi(delta: float) -> void:
@@ -176,11 +199,27 @@ func _yenile_yol() -> void:
 func _anim_ses() -> void:
 	var kov := _durum == "AVLA" or _durum == "KESISME"
 	if _ap: _ap.speed_scale = 1.7 if kov else (1.2 if _durum == "ARA" else 1.0)
-	var sesli := kov or _mesafe < 14.0
+	var sesli := kov or _mesafe < 8.0
 	if sesli and not _growl_acik:
 		_growl.play(); _growl_acik = true
 	elif not sesli and _growl_acik:
 		_growl.stop(); _growl_acik = false
+
+# ----------------------------------------------------- KONUSMA (iblis ses, ara ara)
+func _konusma(delta: float) -> void:
+	_konus_cd -= delta
+	if _konus_cd > 0.0 or (_konus and _konus.playing): return
+	if _player == null or _mesafe > 26.0: return       # cok uzaksa konusmaz
+	# kovalarken daha sik/yakin konusur; ararken seyrek
+	var kov := _durum == "AVLA" or _durum == "KESISME"
+	if not kov and randf() < 0.5: return
+	var ad: String = _av_adlar[randi() % _av_adlar.size()]
+	var s = load("res://audio/canavar/" + ad + ".wav")
+	if s == null: return
+	_konus.stream = s
+	_konus.play()
+	if _alt: _alt.call("goster", AV_METIN[ad], 3.4)
+	_konus_cd = randf_range(15.0, 26.0) if kov else randf_range(22.0, 34.0)
 
 # Sinematik tarafindan cagrilir: canavari belli konuma anlik koy (kovalamadan)
 func sinematik_yerlestir(p: Vector3, bak: Vector3) -> void:
